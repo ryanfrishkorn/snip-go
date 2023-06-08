@@ -6,14 +6,14 @@ import (
 
 type Snip struct {
 	UUID uuid.UUID
-	Data string
+	Data []byte
 }
 
 // New returns a new snippet and generates a new UUID for it
 func New() (Snip, error) {
 	return Snip{
 		UUID: CreateUUID(),
-		Data: "",
+		Data: []byte{},
 	}, nil
 }
 
