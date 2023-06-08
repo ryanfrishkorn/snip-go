@@ -23,10 +23,11 @@ func main() {
 	log.Info().Msg("program execution start")
 
 	// create simple object
-	s := snip.Snip{
-		Uuid: "ysdh-ysh8-sej3-djif",
+	s, err := snip.New()
+	if err != nil {
+		log.Fatal().Msg("could not create new Snip")
 	}
-	log.Info().Str("uuid", s.Uuid).Msg("first snip object")
+	log.Info().Str("uuid", s.UUID).Msg("first snip object")
 
 	log.Info().Msg("program execution complete")
 }
