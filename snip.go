@@ -49,7 +49,7 @@ func GetFromUUID(path string, searchUUID uuid.UUID) (Snip, error) {
 	}
 	defer conn.Close()
 
-	stmt, err := conn.Prepare(`SELECT data from snip WHERE uuid = ?`)
+	stmt, err := conn.Prepare(`SELECT uuid, data, timestamp FROM snip WHERE uuid = ?`)
 	if err != nil {
 		return s, err
 	}
@@ -66,13 +66,21 @@ func GetFromUUID(path string, searchUUID uuid.UUID) (Snip, error) {
 	}
 
 	var data string
-	err = stmt.Scan(&data)
+	var id string
+	var timestamp string
+	err = stmt.Scan(&id, &data, &timestamp)
 	if err != nil {
 		return s, err
 	}
 	s.Data = []byte(data)
-	//FIXME convert this
-	// s.Timestamp = timestamp
+	s.UUID, err = uuid.Parse(id)
+	if err != nil {
+		return s, fmt.Errorf("error parsing uuid string into struct")
+	}
+	s.Timestamp, err = time.Parse(time.RFC3339Nano, timestamp)
+	if err != nil {
+		return s, err
+	}
 	s.UUID = searchUUID
 
 	return s, nil
@@ -96,7 +104,7 @@ func InsertSnip(path string, s Snip) error {
 	}
 	defer stmt.Close()
 
-	err = stmt.Exec(string(s.Data), s.Timestamp.String(), s.UUID.String())
+	err = stmt.Exec(string(s.Data), s.Timestamp.Format(time.RFC3339Nano), s.UUID.String())
 	if err != nil {
 		return err
 	}

@@ -124,7 +124,9 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Str("uuid", *getByUUID).Msg("error retrieving snip with uuid")
 		}
+
 		fmt.Printf("uuid: %s\n", s.UUID.String())
+		fmt.Printf("timestamp: %s\n", s.Timestamp.Format(time.RFC3339Nano))
 		fmt.Printf("data: %s\n", s.Data)
 
 	case "search":
@@ -137,9 +139,14 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Msg("error while searching for term")
 		}
+
 		fmt.Printf("results: %d\n", len(results))
 		for idx, s := range results {
-			fmt.Printf("index: %d uuid: %s data: %s\n", idx, s.UUID.String(), strings.TrimSuffix(string(s.Data), "\n"))
+			fmt.Printf("index: %d uuid: %s timestamp: %s data: %s\n",
+				idx,
+				s.UUID.String(),
+				s.Timestamp.Format(time.RFC3339Nano),
+				strings.TrimSuffix(string(s.Data), "\n"))
 		}
 
 	default:
