@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -74,5 +75,41 @@ func TestGetFromUUID(t *testing.T) {
 	}
 	if bytes.Compare(s.Data, DATA_TEST) != 0 {
 		t.Errorf("expected snip data and DATA_TEST to be equal, Compare returned non-zero")
+	}
+}
+
+func TestFlattenString(t *testing.T) {
+	original := "This is  a\n\nstring that\thas\t\tlots of  whitespace."
+	expected := "This is a string that has lots of whitespace."
+	modified := FlattenString(original)
+	if strings.Compare(expected, modified) != 0 {
+		t.Errorf(`expected string "%s", got "%s"`, expected, modified)
+	}
+}
+
+func TestSnip_CountWords(t *testing.T) {
+	s, err := New()
+	if err != nil {
+		t.Errorf("error generating new snip: %v", err)
+	}
+	s.Data = []byte("This data contains eight words in its entirety")
+	expected := 8
+	count := s.CountWords()
+	if expected != count {
+		t.Errorf("expected %d, got %d", expected, count)
+	}
+}
+
+func TestSnip_GenerateTitle(t *testing.T) {
+	s, err := New()
+	if err != nil {
+		t.Errorf("error generating new snip: %v", err)
+	}
+	s.Data = []byte("My day   at\n the\taquarium started out")
+
+	expected := "My day at the aquarium"
+	modified := s.GenerateTitle(5)
+	if strings.Compare(expected, modified) != 0 {
+		t.Errorf(`expected string "%s", got "%s"`, expected, modified)
 	}
 }

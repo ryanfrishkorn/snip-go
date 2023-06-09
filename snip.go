@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/bvinc/go-sqlite-lite/sqlite3"
 	"github.com/google/uuid"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -12,6 +14,20 @@ type Snip struct {
 	Data      []byte
 	Timestamp time.Time
 	UUID      uuid.UUID
+}
+
+// CountWords returns an integer estimating the number of words in data
+func (s *Snip) CountWords() int {
+	data := FlattenString(string(s.Data))
+	return len(strings.Split(data, " "))
+}
+
+// GenerateTitle returns a clean string derived from processing the data field
+func (s *Snip) GenerateTitle(wordCount int) string {
+	data := FlattenString(string(s.Data))
+	pattern := regexp.MustCompile(`\w+`)
+	title := pattern.FindAllString(data, wordCount)
+	return strings.Join(title, " ")
 }
 
 // New returns a new snippet and generates a new UUID for it
@@ -38,6 +54,18 @@ func CreateNewDatabase(path string) error {
 	}
 
 	return nil
+}
+
+// FlattenString returns a string with all newline, tabs, and spaces squeezed
+func FlattenString(input string) string {
+	// remove newlines and tabs
+	dataSummary := strings.ReplaceAll(input, "\n", " ")
+	dataSummary = strings.ReplaceAll(dataSummary, "\t", " ")
+	// squeeze whitespace
+	pattern := regexp.MustCompile(` +`)
+	dataSummary = pattern.ReplaceAllString(dataSummary, " ")
+
+	return dataSummary
 }
 
 // GetFromUUID retrieves a single Snip by its unique identifier

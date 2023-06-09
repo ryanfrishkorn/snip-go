@@ -9,7 +9,6 @@ import (
 	"github.com/ryanfrishkorn/snip"
 	"io"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -143,13 +142,10 @@ func main() {
 			log.Fatal().Err(err).Msg("error while searching for term")
 		}
 
-		fmt.Printf("results: %d\n", len(results))
-		for idx, s := range results {
-			fmt.Printf("index: %d uuid: %s timestamp: %s data: %s\n",
-				idx,
-				s.UUID.String(),
-				s.Timestamp.Format(time.RFC3339Nano),
-				strings.TrimSuffix(string(s.Data), "\n"))
+		fmt.Printf("results: %d\n\n", len(results))
+		for _, s := range results {
+			printSearchResult(s)
+			fmt.Printf("\n")
 		}
 
 	default:
@@ -157,4 +153,23 @@ func main() {
 	}
 
 	log.Debug().Msg("program execution complete")
+}
+
+func printSearchResult(s snip.Snip) {
+	// truncate data for display
+	maxChars := 70
+	// dataSummary := snip.FlattenString(string(s.Data))
+	dataSummary := string(s.Data)
+
+	if len(dataSummary) < maxChars {
+		maxChars = len(dataSummary)
+	}
+
+	dataSummary = dataSummary[:maxChars]
+	fmt.Printf("uuid: %s timestamp: %s\ntitle: %s words: %d\n----\n%s\n----\n",
+		s.UUID.String(),
+		s.Timestamp.Format(time.RFC3339Nano),
+		s.GenerateTitle(5),
+		s.CountWords(),
+		dataSummary)
 }
