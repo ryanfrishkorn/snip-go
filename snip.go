@@ -102,3 +102,46 @@ func InsertSnip(path string, s Snip) error {
 	}
 	return nil
 }
+
+// SearchDataTerm returns a slice of Snips whose data matches supplied terms
+func SearchDataTerm(path string, term string) ([]Snip, error) {
+	var searchResult []Snip
+	if term == "" {
+		return searchResult, fmt.Errorf("refusing to search for empty string")
+	}
+	conn, err := sqlite3.Open(path)
+	if err != nil {
+		return searchResult, err
+	}
+	defer conn.Close()
+
+	// make term search fuzzy
+	termFuzzy := "%" + term + "%"
+	stmt, err := conn.Prepare(`SELECT uuid from snip where data LIKE ?`, termFuzzy)
+	if err != nil {
+		return searchResult, err
+	}
+	defer stmt.Close()
+
+	for {
+		hasRow, err := stmt.Step()
+		if !hasRow {
+			break
+		}
+
+		var idStr string
+		err = stmt.Scan(&idStr)
+		if err != nil {
+			break
+		}
+		id, err := uuid.Parse(idStr)
+
+		s, err := GetFromUUID(path, id)
+		if err != nil {
+			return searchResult, err
+		}
+		searchResult = append(searchResult, s)
+	}
+
+	return searchResult, nil
+}

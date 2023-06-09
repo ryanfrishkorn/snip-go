@@ -9,6 +9,7 @@ import (
 	"github.com/ryanfrishkorn/snip"
 	"io"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -60,6 +61,8 @@ func main() {
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	getByUUID := getCmd.String("u", "", "retrieve by snip UUID")
 
+	searchCmd := flag.NewFlagSet("search", flag.ExitOnError)
+
 	// ensure database is present
 	err := snip.CreateNewDatabase(dbFilePath)
 	if err != nil {
@@ -71,6 +74,7 @@ func main() {
 		fmt.Printf("valid subcommands:\n")
 		fmt.Printf("  add - add a new snip to the database\n")
 		fmt.Printf("  get - retrieve a snip from the database\n")
+		fmt.Printf("  search - return snips whose data contains given term\n")
 		os.Exit(1)
 	}
 
@@ -122,6 +126,21 @@ func main() {
 		}
 		fmt.Printf("uuid: %s\n", s.UUID.String())
 		fmt.Printf("data: %s\n", s.Data)
+
+	case "search":
+		if err := searchCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatal().Err(err).Msg("error parsing search arguments")
+		}
+		term := searchCmd.Args()[0]
+		fmt.Printf("term: %s\n", term)
+		results, err := snip.SearchDataTerm(dbFilePath, term)
+		if err != nil {
+			log.Fatal().Err(err).Msg("error while searching for term")
+		}
+		fmt.Printf("results: %d\n", len(results))
+		for idx, s := range results {
+			fmt.Printf("index: %d uuid: %s data: %s\n", idx, s.UUID.String(), strings.TrimSuffix(string(s.Data), "\n"))
+		}
 
 	default:
 		helpOutput()
