@@ -127,7 +127,10 @@ func main() {
 
 		fmt.Printf("uuid: %s\n", s.UUID.String())
 		fmt.Printf("timestamp: %s\n", s.Timestamp.Format(time.RFC3339Nano))
-		fmt.Printf("data: %s\n", s.Data)
+		fmt.Printf("data: \n")
+		fmt.Printf("----\n")
+		fmt.Printf("%s", s.Data)
+		fmt.Printf("\n----\n")
 
 	case "search":
 		if err := searchCmd.Parse(os.Args[2:]); err != nil {
