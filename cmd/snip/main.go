@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/ryanfrishkorn/snip"
@@ -9,14 +10,6 @@ import (
 	"os"
 	"time"
 )
-
-// ProgramOptions contains all options derived from command invocation
-type ProgramOptions struct {
-	debug        *bool
-	databasePath *string
-	dataFromFile *string
-	help         *bool
-}
 
 // readFromFile reads all data from specified file
 func readFromFile(path string) ([]byte, error) {
@@ -38,60 +31,93 @@ func readFromStdin() ([]byte, error) {
 }
 
 func main() {
+	// configure logging
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	zerolog.TimeFieldFormat = time.RFC3339Nano
+	optionDebug := os.Getenv("DEBUG")
+	if optionDebug != "" && optionDebug != "0" {
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	}
+
 	// preliminaries
 	homePath := os.Getenv("HOME")
 	dbFilename := ".snip.sqlite3"
 	if homePath == "" {
 		log.Fatal().Msg("could not retrieve $HOME environment variable")
 	}
+	dbFilePath := homePath + "/" + dbFilename
 
-	// parse options
-	var options = ProgramOptions{}
-	options.databasePath = flag.String("d", homePath+"/"+dbFilename, "database file location")
-	options.dataFromFile = flag.String("f", "", "use data from specified file")
-	// options.dataFromStdin = flag.Bool("stdin", true, "use data from standard input")
-	options.debug = flag.Bool("debug", false, "enable debug logging")
-	options.help = flag.Bool("help", false, "print help information")
-	flag.Parse()
-
-	// configure logging
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	if *options.debug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	// establish action
+	if len(os.Args) < 2 {
+		log.Fatal().Msg("please use a valid action")
 	}
-	zerolog.TimeFieldFormat = time.RFC3339Nano
+	action := os.Args[1]
 
-	log.Info().Msg("program execution start")
+	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
+	addDatabasePath := addCmd.String("d", dbFilePath, "database file location")
+	addDataFromFile := addCmd.String("f", "", "use data from specified file")
+
+	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
+	getByUUID := getCmd.String("u", "", "retrieve by snip UUID")
 
 	// ensure database is present
-	snip.CreateNewDatabase(*options.databasePath)
-
-	// create simple object
-	s, err := snip.New()
+	err := snip.CreateNewDatabase(*addDatabasePath)
 	if err != nil {
-		log.Fatal().Msg("could not create new Snip")
+		log.Fatal().Err(err).Msg("error opening database")
 	}
 
-	// file input takes precedence, but default to standard input
-	if *options.dataFromFile != "" {
-		data, err := readFromFile(*options.dataFromFile)
-		if err != nil {
-			log.Fatal().Err(err).Msg("error reading from file")
+	fmt.Printf("action: %s\n", action)
+	helpOutput := func() {
+		fmt.Printf("valid subcommands:\n")
+		fmt.Printf("  add - add a new snip to the database\n")
+		fmt.Printf("  get - retrieve a snip from the database\n")
+		os.Exit(1)
+	}
+
+	switch action {
+	case "add":
+		if err := addCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatal().Err(err).Msg("error parsing add arguments")
 		}
-		s.Data = data
-	} else {
-		data, err := readFromStdin()
+		fmt.Printf("remaining args: %v\n", addCmd.Args())
+
+		// create simple object
+		s, err := snip.New()
 		if err != nil {
-			log.Fatal().Msg("error reading from standard input")
+			log.Fatal().Msg("could not create new Snip")
 		}
-		s.Data = data
+
+		// file input takes precedence, but default to standard input
+		if *addDataFromFile != "" {
+			data, err := readFromFile(*addDataFromFile)
+			if err != nil {
+				log.Fatal().Err(err).Msg("error reading from file")
+			}
+			s.Data = data
+		} else {
+			data, err := readFromStdin()
+			if err != nil {
+				log.Fatal().Msg("error reading from standard input")
+			}
+			s.Data = data
+		}
+
+		log.Debug().Str("UUID", s.UUID.String()).Bytes("Data", s.Data).Msg("first snip object")
+		err = snip.InsertSnip(*addDatabasePath, s)
+		if err != nil {
+			log.Fatal().Err(err).Msg("error inserting Snip into database")
+		}
+
+	case "get":
+		if err := getCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatal().Err(err).Msg("error parsing get arguments")
+		}
+		fmt.Printf("remaining args: %v\n", addCmd.Args())
+		fmt.Printf("uuid: %s\n", *getByUUID)
+
+	default:
+		helpOutput()
 	}
 
-	log.Info().Str("UUID", s.UUID.String()).Bytes("Data", s.Data).Msg("first snip object")
-	err = snip.InsertSnip(*options.databasePath, s)
-	if err != nil {
-		log.Fatal().Err(err).Msg("error inserting Snip into database")
-	}
-
-	log.Info().Msg("program execution complete")
+	log.Debug().Msg("program execution complete")
 }
