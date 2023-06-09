@@ -80,6 +80,10 @@ func GetFromUUID(path string, searchUUID uuid.UUID) (Snip, error) {
 
 // InsertSnip adds a new Snip to the database
 func InsertSnip(path string, s Snip) error {
+	// do not insert without data
+	if len(s.Data) == 0 {
+		return fmt.Errorf("refusing to insert zero-length data")
+	}
 	conn, err := sqlite3.Open(path)
 	if err != nil {
 		return err

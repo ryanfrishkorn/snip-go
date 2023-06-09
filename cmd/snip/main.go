@@ -12,11 +12,10 @@ import (
 
 // ProgramOptions contains all options derived from command invocation
 type ProgramOptions struct {
-	debug         *bool
-	databasePath  *string
-	dataFromFile  *string
-	dataFromStdin *bool
-	help          *bool
+	debug        *bool
+	databasePath *string
+	dataFromFile *string
+	help         *bool
 }
 
 // readFromFile reads all data from specified file
@@ -50,7 +49,7 @@ func main() {
 	var options = ProgramOptions{}
 	options.databasePath = flag.String("d", homePath+"/"+dbFilename, "database file location")
 	options.dataFromFile = flag.String("f", "", "use data from specified file")
-	options.dataFromStdin = flag.Bool("stdin", true, "use data from standard input")
+	// options.dataFromStdin = flag.Bool("stdin", true, "use data from standard input")
 	options.debug = flag.Bool("debug", false, "enable debug logging")
 	options.help = flag.Bool("help", false, "print help information")
 	flag.Parse()
@@ -73,24 +72,22 @@ func main() {
 		log.Fatal().Msg("could not create new Snip")
 	}
 
-	// obtain data
+	// file input takes precedence, but default to standard input
 	if *options.dataFromFile != "" {
-		// ensure that stdin is false
-		*options.dataFromStdin = false
 		data, err := readFromFile(*options.dataFromFile)
 		if err != nil {
 			log.Fatal().Err(err).Msg("error reading from file")
 		}
 		s.Data = data
-	}
-	if *options.dataFromStdin {
+	} else {
 		data, err := readFromStdin()
 		if err != nil {
 			log.Fatal().Msg("error reading from standard input")
 		}
 		s.Data = data
 	}
-	log.Debug().Str("UUID", s.UUID.String()).Bytes("Data", s.Data).Msg("first snip object")
+
+	log.Info().Str("UUID", s.UUID.String()).Bytes("Data", s.Data).Msg("first snip object")
 	err = snip.InsertSnip(*options.databasePath, s)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error inserting Snip into database")
