@@ -13,6 +13,7 @@ import (
 // ProgramOptions contains all options derived from command invocation
 type ProgramOptions struct {
 	debug         *bool
+	databasePath  *string
 	dataFromFile  *string
 	dataFromStdin *bool
 	help          *bool
@@ -38,8 +39,16 @@ func readFromStdin() ([]byte, error) {
 }
 
 func main() {
+	// preliminaries
+	homePath := os.Getenv("HOME")
+	dbFilename := ".snip.sqlite3"
+	if homePath == "" {
+		log.Fatal().Msg("could not retrieve $HOME environment variable")
+	}
+
 	// parse options
 	var options = ProgramOptions{}
+	options.databasePath = flag.String("d", homePath+"/"+dbFilename, "database file location")
 	options.dataFromFile = flag.String("f", "", "use data from specified file")
 	options.dataFromStdin = flag.Bool("stdin", true, "use data from standard input")
 	options.debug = flag.Bool("debug", false, "enable debug logging")
@@ -54,6 +63,9 @@ func main() {
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 
 	log.Info().Msg("program execution start")
+
+	// ensure database is present
+	snip.CreateNewDatabase(*options.databasePath)
 
 	// create simple object
 	s, err := snip.New()
@@ -78,7 +90,11 @@ func main() {
 		}
 		s.Data = data
 	}
-	log.Info().Str("UUID", s.UUID.String()).Bytes("Data", s.Data).Msg("first snip object")
+	log.Debug().Str("UUID", s.UUID.String()).Bytes("Data", s.Data).Msg("first snip object")
+	err = snip.InsertSnip(*options.databasePath, s)
+	if err != nil {
+		log.Fatal().Err(err).Msg("error inserting Snip into database")
+	}
 
 	log.Info().Msg("program execution complete")
 }
