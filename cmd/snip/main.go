@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/ryanfrishkorn/snip"
@@ -54,14 +55,13 @@ func main() {
 	action := os.Args[1]
 
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
-	addDatabasePath := addCmd.String("d", dbFilePath, "database file location")
 	addDataFromFile := addCmd.String("f", "", "use data from specified file")
 
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	getByUUID := getCmd.String("u", "", "retrieve by snip UUID")
 
 	// ensure database is present
-	err := snip.CreateNewDatabase(*addDatabasePath)
+	err := snip.CreateNewDatabase(dbFilePath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error opening database")
 	}
@@ -79,7 +79,6 @@ func main() {
 		if err := addCmd.Parse(os.Args[2:]); err != nil {
 			log.Fatal().Err(err).Msg("error parsing add arguments")
 		}
-		fmt.Printf("remaining args: %v\n", addCmd.Args())
 
 		// create simple object
 		s, err := snip.New()
@@ -103,17 +102,26 @@ func main() {
 		}
 
 		log.Debug().Str("UUID", s.UUID.String()).Bytes("Data", s.Data).Msg("first snip object")
-		err = snip.InsertSnip(*addDatabasePath, s)
+		err = snip.InsertSnip(dbFilePath, s)
 		if err != nil {
 			log.Fatal().Err(err).Msg("error inserting Snip into database")
 		}
+		fmt.Printf("successfully added snip with uuid: %s\n", s.UUID)
 
 	case "get":
 		if err := getCmd.Parse(os.Args[2:]); err != nil {
 			log.Fatal().Err(err).Msg("error parsing get arguments")
 		}
-		fmt.Printf("remaining args: %v\n", addCmd.Args())
-		fmt.Printf("uuid: %s\n", *getByUUID)
+		id, err := uuid.Parse(*getByUUID)
+		if err != nil {
+			log.Fatal().Err(err).Msg("error converting from bytes to uuid type")
+		}
+		s, err := snip.GetFromUUID(dbFilePath, id)
+		if err != nil {
+			log.Fatal().Err(err).Str("uuid", *getByUUID).Msg("error retrieving snip with uuid")
+		}
+		fmt.Printf("uuid: %s\n", s.UUID.String())
+		fmt.Printf("data: %s\n", s.Data)
 
 	default:
 		helpOutput()
