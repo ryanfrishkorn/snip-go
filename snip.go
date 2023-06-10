@@ -62,7 +62,7 @@ func FlattenString(input string) string {
 }
 
 // GetFromUUID retrieves a single Snip by its unique identifier
-func GetFromUUID(path string, searchUUID uuid.UUID) (Snip, error) {
+func GetFromUUID(path string, searchUUID string) (Snip, error) {
 	s := Snip{}
 	conn, err := sqlite3.Open(path)
 	if err != nil {
@@ -70,41 +70,69 @@ func GetFromUUID(path string, searchUUID uuid.UUID) (Snip, error) {
 	}
 	defer conn.Close()
 
-	stmt, err := conn.Prepare(`SELECT uuid, data, timestamp, title FROM snip WHERE uuid = ?`)
+	// determine exact or partial matching
+	var exactMatch bool
+	var maxLength = 36
+	length := len(searchUUID)
+
+	switch {
+	case length > maxLength || length == 0:
+		return s, fmt.Errorf("supplied uuid string must be 1 to %d characters", maxLength)
+	case length == maxLength:
+		exactMatch = true
+	default:
+		exactMatch = false
+	}
+
+	var stmt *sqlite3.Stmt
+	if exactMatch {
+		stmt, err = conn.Prepare(`SELECT uuid, data, timestamp, title FROM snip WHERE uuid = ?`, searchUUID)
+	} else {
+		searchUUIDFuzzy := "%" + searchUUID + "%"
+		stmt, err = conn.Prepare(`SELECT uuid, data, timestamp, title FROM snip WHERE uuid LIKE ?`, searchUUIDFuzzy)
+	}
 	if err != nil {
 		return s, err
 	}
 	defer stmt.Close()
 
-	err = stmt.Exec(searchUUID.String())
 	if err != nil {
 		return s, err
 	}
 
-	hasRow, err := stmt.Step()
-	if !hasRow {
+	resultCount := 0
+	for {
+		hasRow, err := stmt.Step()
+		if !hasRow {
+			break
+		}
+		resultCount++
+		// enforce only one result to avoid ambiguous behavior
+		if resultCount > 1 {
+			return s, fmt.Errorf("database search returned multiple results")
+		}
+
+		var data string
+		var id string
+		var timestamp string
+		var title string
+		err = stmt.Scan(&id, &data, &timestamp, &title)
+		if err != nil {
+			return s, err
+		}
+		s.Data = []byte(data)
+		s.UUID, err = uuid.Parse(id)
+		if err != nil {
+			return s, fmt.Errorf("error parsing uuid string into struct")
+		}
+		s.Timestamp, err = time.Parse(time.RFC3339Nano, timestamp)
+		if err != nil {
+			return s, err
+		}
+	}
+	if resultCount == 0 {
 		return s, fmt.Errorf("database search returned zero results")
 	}
-
-	var data string
-	var id string
-	var timestamp string
-	var title string
-	err = stmt.Scan(&id, &data, &timestamp, &title)
-	if err != nil {
-		return s, err
-	}
-	s.Data = []byte(data)
-	s.UUID, err = uuid.Parse(id)
-	if err != nil {
-		return s, fmt.Errorf("error parsing uuid string into struct")
-	}
-	s.Timestamp, err = time.Parse(time.RFC3339Nano, timestamp)
-	if err != nil {
-		return s, err
-	}
-	s.UUID = searchUUID
-
 	return s, nil
 }
 
@@ -233,9 +261,8 @@ func SearchDataTerm(path string, term string) ([]Snip, error) {
 		if err != nil {
 			break
 		}
-		id, err := uuid.Parse(idStr)
 
-		s, err := GetFromUUID(path, id)
+		s, err := GetFromUUID(path, idStr)
 		if err != nil {
 			return searchResult, err
 		}
@@ -279,11 +306,7 @@ func SearchUUID(path string, term string) ([]Snip, error) {
 			// TODO scrutinize this
 			break
 		}
-		id, err := uuid.Parse(idStr)
-		if err != nil {
-			return searchResult, err
-		}
-		s, err := GetFromUUID(path, id)
+		s, err := GetFromUUID(path, idStr)
 		if err != nil {
 			return searchResult, err
 		}

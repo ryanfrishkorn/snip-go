@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/ryanfrishkorn/snip"
@@ -115,19 +114,19 @@ func main() {
 			log.Fatal().Err(err).Msg("error parsing get arguments")
 		}
 		idStr := getCmd.Args()[0]
-		id, err := uuid.Parse(idStr)
 		if err != nil {
 			log.Fatal().Err(err).Msg("error converting from bytes to uuid type")
 		}
-		s, err := snip.GetFromUUID(dbFilePath, id)
+		s, err := snip.GetFromUUID(dbFilePath, idStr)
 		if err != nil {
-			log.Fatal().Err(err).Str("uuid", id.String()).Msg("error retrieving snip with uuid")
+			log.Fatal().Err(err).Str("uuid", idStr).Msg("error retrieving snip with uuid")
 		}
 
 		if *getRawData {
 			fmt.Printf("%s", s.Data)
 		} else {
 			fmt.Printf("uuid: %s\n", s.UUID.String())
+			fmt.Printf("title: %s\n", s.Title)
 			fmt.Printf("timestamp: %s\n", s.Timestamp.Format(time.RFC3339Nano))
 			fmt.Printf("data: \n")
 			fmt.Printf("----\n")

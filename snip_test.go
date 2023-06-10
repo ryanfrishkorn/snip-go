@@ -64,7 +64,7 @@ func TestInsertSnip(t *testing.T) {
 }
 
 func TestGetFromUUID(t *testing.T) {
-	s, err := GetFromUUID(DATABASE_PATH, UUID_TEST)
+	s, err := GetFromUUID(DATABASE_PATH, UUID_TEST.String())
 	if err != nil {
 		t.Errorf("error retrieving uuid %s: %v", UUID_TEST, err)
 	}
