@@ -29,9 +29,18 @@ func main() {
 	}
 	dbFilePath := homePath + "/" + dbFilename
 
+	helpOutput := func() {
+		fmt.Printf("valid subcommands:\n")
+		fmt.Printf("  add - add a new snip\n")
+		fmt.Printf("  get - retrieve snip with specified uuid\n")
+		fmt.Printf("  ls - list all snips\n")
+		fmt.Printf("  search - return snips whose data contains given term\n")
+		os.Exit(1)
+	}
+
 	// establish action
 	if len(os.Args) < 2 {
-		log.Fatal().Msg("please use a valid action")
+		helpOutput()
 	}
 	action := os.Args[1]
 
@@ -55,14 +64,6 @@ func main() {
 	}
 
 	log.Debug().Str("action", action).Msg("action invoked")
-	helpOutput := func() {
-		fmt.Printf("valid subcommands:\n")
-		fmt.Printf("  add - add a new snip\n")
-		fmt.Printf("  get - retrieve snip with specified uuid\n")
-		fmt.Printf("  ls - list all snips\n")
-		fmt.Printf("  search - return snips whose data contains given term\n")
-		os.Exit(1)
-	}
 
 	switch action {
 	case "add":
