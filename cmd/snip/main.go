@@ -60,6 +60,9 @@ func main() {
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	getByUUID := getCmd.String("u", "", "retrieve by snip UUID")
 
+	listCmd := flag.NewFlagSet("ls", flag.ExitOnError)
+	listLimit := listCmd.Int("l", 0, "limit results")
+
 	searchCmd := flag.NewFlagSet("search", flag.ExitOnError)
 
 	// ensure database is present
@@ -130,6 +133,19 @@ func main() {
 		fmt.Printf("----\n")
 		fmt.Printf("%s", s.Data)
 		fmt.Printf("\n----\n")
+
+	case "ls":
+		if err := searchCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatal().Err(err).Msg("error parsing search arguments")
+		}
+		results, err := snip.List(dbFilePath, *listLimit)
+		if err != nil {
+			log.Fatal().Err(err).Msg("error listing items")
+		}
+		fmt.Println(len(results))
+		for _, s := range results {
+			fmt.Printf("%s %s\n", s.UUID, s.GenerateTitle(5))
+		}
 
 	case "search":
 		if err := searchCmd.Parse(os.Args[2:]); err != nil {

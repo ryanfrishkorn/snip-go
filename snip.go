@@ -139,6 +139,62 @@ func InsertSnip(path string, s Snip) error {
 	return nil
 }
 
+// List returns a slice of all Snips in the database
+func List(path string, limit int) ([]Snip, error) {
+	var results []Snip
+	var stmt *sqlite3.Stmt
+
+	conn, err := sqlite3.Open(path)
+	if err != nil {
+		return results, err
+	}
+	defer conn.Close()
+
+	if limit != 0 {
+		stmt, err = conn.Prepare(`SELECT uuid, timestamp, data from snip LIMIT ?`, limit)
+		if err != nil {
+			return results, err
+		}
+	} else {
+		stmt, err = conn.Prepare(`SELECT uuid, timestamp, data from snip`)
+	}
+	if err != nil {
+		return results, err
+	}
+	defer stmt.Close()
+
+	for {
+		hasRow, err := stmt.Step()
+		if !hasRow {
+			break
+		}
+
+		var idStr string
+		var timestampStr string
+		var data []byte
+
+		err = stmt.Scan(&idStr, &timestampStr, &data)
+		if err != nil {
+			break
+		}
+
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return results, err
+		}
+
+		timestamp, err := time.Parse(time.RFC3339Nano, timestampStr)
+		// construct item
+		s := Snip{
+			UUID:      id,
+			Timestamp: timestamp,
+			Data:      data,
+		}
+		results = append(results, s)
+	}
+	return results, nil
+}
+
 // SearchDataTerm returns a slice of Snips whose data matches supplied terms
 func SearchDataTerm(path string, term string) ([]Snip, error) {
 	var searchResult []Snip
