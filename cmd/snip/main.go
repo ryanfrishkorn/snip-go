@@ -171,8 +171,7 @@ func main() {
 
 		fmt.Printf("results: %d\n\n", len(results))
 		for _, s := range results {
-			printSearchResult(s)
-			fmt.Printf("\n")
+			fmt.Printf("uuid: %s title: %s\n", s.UUID.String(), s.Title)
 		}
 
 	default:
@@ -180,26 +179,6 @@ func main() {
 	}
 
 	log.Debug().Msg("program execution complete")
-}
-
-// printSearchResult prints a summary of a result
-func printSearchResult(s snip.Snip) {
-	// truncate data for display
-	maxChars := 70
-	// dataSummary := snip.FlattenString(string(s.Data))
-	dataSummary := string(s.Data)
-
-	if len(dataSummary) < maxChars {
-		maxChars = len(dataSummary)
-	}
-
-	dataSummary = dataSummary[:maxChars]
-	fmt.Printf("uuid: %s timestamp: %s\ntitle: %s words: %d\n----\n%s\n----\n",
-		s.UUID.String(),
-		s.Timestamp.Format(time.RFC3339Nano),
-		s.GenerateTitle(5),
-		s.CountWords(),
-		dataSummary)
 }
 
 // readFromFile reads all data from specified file

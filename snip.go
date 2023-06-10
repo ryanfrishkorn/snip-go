@@ -126,6 +126,7 @@ func GetFromUUID(path string, searchUUID string) (Snip, error) {
 			return s, fmt.Errorf("error parsing uuid string into struct")
 		}
 		s.Timestamp, err = time.Parse(time.RFC3339Nano, timestamp)
+		s.Title = title
 		if err != nil {
 			return s, err
 		}
