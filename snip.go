@@ -237,3 +237,50 @@ func SearchDataTerm(path string, term string) ([]Snip, error) {
 
 	return searchResult, nil
 }
+
+// SearchUUID returns a slice of Snips with uuids matching partial search term
+func SearchUUID(path string, term string) ([]Snip, error) {
+	var searchResult []Snip
+	if term == "" {
+		return searchResult, fmt.Errorf("refusing to search for empty string")
+	}
+	conn, err := sqlite3.Open(path)
+	if err != nil {
+		return searchResult, err
+	}
+	defer conn.Close()
+
+	termFuzzy := "%" + term + "%"
+	stmt, err := conn.Prepare(`SELECT uuid from snip where uuid LIKE ?`, termFuzzy)
+	if err != nil {
+		return searchResult, err
+	}
+	defer stmt.Close()
+
+	for {
+		hasRow, err := stmt.Step()
+		if err != nil {
+			return searchResult, err
+		}
+		if !hasRow {
+			break
+		}
+
+		var idStr string
+		err = stmt.Scan(&idStr)
+		if err != nil {
+			// TODO scrutinize this
+			break
+		}
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return searchResult, err
+		}
+		s, err := GetFromUUID(path, id)
+		if err != nil {
+			return searchResult, err
+		}
+		searchResult = append(searchResult, s)
+	}
+	return searchResult, nil
+}

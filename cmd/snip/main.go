@@ -45,6 +45,8 @@ func main() {
 	listLimit := listCmd.Int("l", 0, "limit results")
 
 	searchCmd := flag.NewFlagSet("search", flag.ExitOnError)
+	// fuzzy data search by default unless field is specified
+	searchField := searchCmd.String("f", "data", "field to search")
 
 	// ensure database is present
 	err := snip.CreateNewDatabase(dbFilePath)
@@ -116,7 +118,7 @@ func main() {
 		fmt.Printf("\n----\n")
 
 	case "ls":
-		if err := searchCmd.Parse(os.Args[2:]); err != nil {
+		if err := listCmd.Parse(os.Args[2:]); err != nil {
 			log.Fatal().Err(err).Msg("error parsing search arguments")
 		}
 		results, err := snip.List(dbFilePath, *listLimit)
@@ -132,11 +134,22 @@ func main() {
 		if err := searchCmd.Parse(os.Args[2:]); err != nil {
 			log.Fatal().Err(err).Msg("error parsing search arguments")
 		}
+
+		var results []snip.Snip
 		term := searchCmd.Args()[0]
-		fmt.Printf("term: %s\n", term)
-		results, err := snip.SearchDataTerm(dbFilePath, term)
-		if err != nil {
-			log.Fatal().Err(err).Msg("error while searching for term")
+		fmt.Printf("searching data field for: %s\n", term)
+		switch *searchField {
+		case "data":
+			results, err = snip.SearchDataTerm(dbFilePath, term)
+			if err != nil {
+				log.Fatal().Err(err).Msg("error while searching for term")
+			}
+
+		case "uuid":
+			results, err = snip.SearchUUID(dbFilePath, term)
+			if err != nil {
+				log.Fatal().Err(err).Msg("error while searching for term")
+			}
 		}
 
 		fmt.Printf("results: %d\n\n", len(results))
