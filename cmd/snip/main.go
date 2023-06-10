@@ -54,11 +54,12 @@ func main() {
 		log.Fatal().Err(err).Msg("error opening database")
 	}
 
-	fmt.Printf("action: %s\n", action)
+	log.Debug().Str("action", action).Msg("action invoked")
 	helpOutput := func() {
 		fmt.Printf("valid subcommands:\n")
-		fmt.Printf("  add - add a new snip to the database\n")
-		fmt.Printf("  get - retrieve a snip from the database\n")
+		fmt.Printf("  add - add a new snip\n")
+		fmt.Printf("  get - retrieve snip with specified uuid\n")
+		fmt.Printf("  ls - list all snips\n")
 		fmt.Printf("  search - return snips whose data contains given term\n")
 		os.Exit(1)
 	}
@@ -125,7 +126,7 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Msg("error listing items")
 		}
-		fmt.Println(len(results))
+		fmt.Printf("results: %d\n", len(results))
 		for _, s := range results {
 			fmt.Printf("%s %s\n", s.UUID, s.GenerateTitle(5))
 		}
