@@ -46,6 +46,7 @@ func main() {
 
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	addDataFromFile := addCmd.String("f", "", "use data from specified file")
+	addTitle := addCmd.String("t", "", "specify title")
 
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	getRawData := getCmd.Bool("raw", false, "output only raw data")
@@ -91,6 +92,7 @@ func main() {
 			}
 			s.Data = data
 		}
+		s.Title = *addTitle
 		// generate title if empty
 		if s.Title == "" {
 			s.Title = s.GenerateTitle(5)
