@@ -91,8 +91,17 @@ func main() {
 			}
 			s.Data = data
 		}
+		// generate title if empty
+		if s.Title == "" {
+			s.Title = s.GenerateTitle(5)
+		}
 
-		log.Debug().Str("UUID", s.UUID.String()).Bytes("Data", s.Data).Msg("first snip object")
+		log.Debug().
+			Str("UUID", s.UUID.String()).
+			Str("timestamp", s.Timestamp.String()).
+			Str("title", s.Title).
+			Bytes("Data", s.Data).
+			Msg("first snip object")
 		err = snip.InsertSnip(dbFilePath, s)
 		if err != nil {
 			log.Fatal().Err(err).Msg("error inserting Snip into database")
@@ -129,7 +138,7 @@ func main() {
 		}
 		fmt.Printf("results: %d\n", len(results))
 		for _, s := range results {
-			fmt.Printf("%s %s\n", s.UUID, s.GenerateTitle(5))
+			fmt.Printf("%s %s\n", s.UUID, s.Title)
 		}
 
 	case "search":

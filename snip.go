@@ -13,6 +13,7 @@ import (
 type Snip struct {
 	Data      []byte
 	Timestamp time.Time
+	Title     string
 	UUID      uuid.UUID
 }
 
@@ -25,6 +26,7 @@ func (s *Snip) CountWords() int {
 // GenerateTitle returns a clean string derived from processing the data field
 func (s *Snip) GenerateTitle(wordCount int) string {
 	data := FlattenString(string(s.Data))
+	// FIXME by allowing additional sensible characters such as `:`
 	pattern := regexp.MustCompile(`\w+`)
 	title := pattern.FindAllString(data, wordCount)
 	return strings.Join(title, " ")
@@ -39,7 +41,7 @@ func CreateNewDatabase(path string) error {
 	defer conn.Close()
 
 	// build schema
-	err = conn.Exec(`CREATE TABLE IF NOT EXISTS snip(data TEXT, timestamp TEXT, uuid TEXT)`)
+	err = conn.Exec(`CREATE TABLE IF NOT EXISTS snip(uuid TEXT, timestamp TEXT, title TEXT, data TEXT)`)
 	if err != nil {
 		return err
 	}
@@ -68,7 +70,7 @@ func GetFromUUID(path string, searchUUID uuid.UUID) (Snip, error) {
 	}
 	defer conn.Close()
 
-	stmt, err := conn.Prepare(`SELECT uuid, data, timestamp FROM snip WHERE uuid = ?`)
+	stmt, err := conn.Prepare(`SELECT uuid, data, timestamp, title FROM snip WHERE uuid = ?`)
 	if err != nil {
 		return s, err
 	}
@@ -87,7 +89,8 @@ func GetFromUUID(path string, searchUUID uuid.UUID) (Snip, error) {
 	var data string
 	var id string
 	var timestamp string
-	err = stmt.Scan(&id, &data, &timestamp)
+	var title string
+	err = stmt.Scan(&id, &data, &timestamp, &title)
 	if err != nil {
 		return s, err
 	}
@@ -117,13 +120,14 @@ func InsertSnip(path string, s Snip) error {
 	}
 	defer conn.Close()
 
-	stmt, err := conn.Prepare(`INSERT INTO snip VALUES (?, ?, ?)`)
+	stmt, err := conn.Prepare(`INSERT INTO snip VALUES (?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
-	err = stmt.Exec(string(s.Data), s.Timestamp.Format(time.RFC3339Nano), s.UUID.String())
+	// reference
+	err = stmt.Exec(s.UUID.String(), s.Timestamp.Format(time.RFC3339Nano), s.Title, string(s.Data))
 	if err != nil {
 		return err
 	}
@@ -142,12 +146,12 @@ func List(path string, limit int) ([]Snip, error) {
 	defer conn.Close()
 
 	if limit != 0 {
-		stmt, err = conn.Prepare(`SELECT uuid, timestamp, data from snip LIMIT ?`, limit)
+		stmt, err = conn.Prepare(`SELECT uuid, timestamp, title, data from snip LIMIT ?`, limit)
 		if err != nil {
 			return results, err
 		}
 	} else {
-		stmt, err = conn.Prepare(`SELECT uuid, timestamp, data from snip`)
+		stmt, err = conn.Prepare(`SELECT uuid, timestamp, title, data from snip`)
 	}
 	if err != nil {
 		return results, err
@@ -162,9 +166,10 @@ func List(path string, limit int) ([]Snip, error) {
 
 		var idStr string
 		var timestampStr string
+		var title string
 		var data []byte
 
-		err = stmt.Scan(&idStr, &timestampStr, &data)
+		err = stmt.Scan(&idStr, &timestampStr, &title, &data)
 		if err != nil {
 			break
 		}
@@ -179,6 +184,7 @@ func List(path string, limit int) ([]Snip, error) {
 		s := Snip{
 			UUID:      id,
 			Timestamp: timestamp,
+			Title:     title,
 			Data:      data,
 		}
 		results = append(results, s)
@@ -191,6 +197,7 @@ func New() (Snip, error) {
 	return Snip{
 		Data:      []byte{},
 		Timestamp: time.Now(),
+		Title:     "",
 		UUID:      uuid.New(),
 	}, nil
 }
