@@ -30,15 +30,6 @@ func (s *Snip) GenerateTitle(wordCount int) string {
 	return strings.Join(title, " ")
 }
 
-// New returns a new snippet and generates a new UUID for it
-func New() (Snip, error) {
-	return Snip{
-		Data:      []byte{},
-		Timestamp: time.Now(),
-		UUID:      uuid.New(),
-	}, nil
-}
-
 // CreateNewDatabase creates a new sqlite3 database
 func CreateNewDatabase(path string) error {
 	conn, err := sqlite3.Open(path)
@@ -193,6 +184,15 @@ func List(path string, limit int) ([]Snip, error) {
 		results = append(results, s)
 	}
 	return results, nil
+}
+
+// New returns a new snippet and generates a new UUID for it
+func New() (Snip, error) {
+	return Snip{
+		Data:      []byte{},
+		Timestamp: time.Now(),
+		UUID:      uuid.New(),
+	}, nil
 }
 
 // SearchDataTerm returns a slice of Snips whose data matches supplied terms

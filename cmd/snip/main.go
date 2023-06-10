@@ -12,25 +12,6 @@ import (
 	"time"
 )
 
-// readFromFile reads all data from specified file
-func readFromFile(path string) ([]byte, error) {
-	// TODO check file size for sanity to avoid polluting a database
-	f, err := os.ReadFile(path)
-	if err != nil {
-		return []byte{}, err
-	}
-	return f, nil
-}
-
-// readFromStdin reads all data from standard input
-func readFromStdin() ([]byte, error) {
-	data, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		return []byte{}, err
-	}
-	return data, nil
-}
-
 func main() {
 	// configure logging
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
@@ -171,6 +152,7 @@ func main() {
 	log.Debug().Msg("program execution complete")
 }
 
+// printSearchResult prints a summary of a result
 func printSearchResult(s snip.Snip) {
 	// truncate data for display
 	maxChars := 70
@@ -188,4 +170,23 @@ func printSearchResult(s snip.Snip) {
 		s.GenerateTitle(5),
 		s.CountWords(),
 		dataSummary)
+}
+
+// readFromFile reads all data from specified file
+func readFromFile(path string) ([]byte, error) {
+	// TODO check file size for sanity to avoid polluting a database
+	f, err := os.ReadFile(path)
+	if err != nil {
+		return []byte{}, err
+	}
+	return f, nil
+}
+
+// readFromStdin reads all data from standard input
+func readFromStdin() ([]byte, error) {
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return []byte{}, err
+	}
+	return data, nil
 }
