@@ -48,7 +48,7 @@ func main() {
 	addDataFromFile := addCmd.String("f", "", "use data from specified file")
 
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
-	getByUUID := getCmd.String("u", "", "retrieve by snip UUID")
+	getRawData := getCmd.Bool("raw", false, "output only raw data")
 
 	listCmd := flag.NewFlagSet("ls", flag.ExitOnError)
 	listLimit := listCmd.Int("l", 0, "limit results")
@@ -112,21 +112,26 @@ func main() {
 		if err := getCmd.Parse(os.Args[2:]); err != nil {
 			log.Fatal().Err(err).Msg("error parsing get arguments")
 		}
-		id, err := uuid.Parse(*getByUUID)
+		idStr := getCmd.Args()[0]
+		id, err := uuid.Parse(idStr)
 		if err != nil {
 			log.Fatal().Err(err).Msg("error converting from bytes to uuid type")
 		}
 		s, err := snip.GetFromUUID(dbFilePath, id)
 		if err != nil {
-			log.Fatal().Err(err).Str("uuid", *getByUUID).Msg("error retrieving snip with uuid")
+			log.Fatal().Err(err).Str("uuid", id.String()).Msg("error retrieving snip with uuid")
 		}
 
-		fmt.Printf("uuid: %s\n", s.UUID.String())
-		fmt.Printf("timestamp: %s\n", s.Timestamp.Format(time.RFC3339Nano))
-		fmt.Printf("data: \n")
-		fmt.Printf("----\n")
-		fmt.Printf("%s", s.Data)
-		fmt.Printf("\n----\n")
+		if *getRawData {
+			fmt.Printf("%s", s.Data)
+		} else {
+			fmt.Printf("uuid: %s\n", s.UUID.String())
+			fmt.Printf("timestamp: %s\n", s.Timestamp.Format(time.RFC3339Nano))
+			fmt.Printf("data: \n")
+			fmt.Printf("----\n")
+			fmt.Printf("%s", s.Data)
+			fmt.Printf("\n----\n")
+		}
 
 	case "ls":
 		if err := listCmd.Parse(os.Args[2:]); err != nil {
