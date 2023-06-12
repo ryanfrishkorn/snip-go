@@ -126,8 +126,19 @@ func main() {
 
 		// REMOVE attachments by uuid
 		if *attachRemove == true {
-			for _, attachmentUUID := range attachCmd.Args() {
-				fmt.Printf("removing attachment %s\n", attachmentUUID)
+			for _, idStr := range attachCmd.Args() {
+				id, err := uuid.Parse(idStr)
+				if err != nil {
+					log.Error().Err(err).Str("uuid", "idStr").Msg("error parsing uuid")
+					fmt.Fprintf(os.Stderr, "could not parse attachment %s", idStr)
+				}
+				err = snip.DeleteAttachment(dbFilePath, id)
+				if err != nil {
+					log.Error().Err(err).Str("uuid", idStr).Msg("error removing attachment")
+					fmt.Fprintf(os.Stderr, "could not delete attachment %s", idStr)
+				} else {
+					fmt.Printf("removed attachment %s\n", id)
+				}
 			}
 			break
 		}

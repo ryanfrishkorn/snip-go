@@ -100,6 +100,27 @@ func Delete(path string, id uuid.UUID) error {
 	return nil
 }
 
+// DeleteAttachment deletes an attachment from the database
+func DeleteAttachment(path string, id uuid.UUID) error {
+	conn, err := sqlite3.Open(path)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	// remove
+	stmt, err := conn.Prepare(`DELETE from snip_attachment WHERE uuid = ? LIMIT 1`, id.String())
+	if err != nil {
+		return err
+	}
+	err = stmt.Exec()
+	if err != nil {
+		return err
+	}
+	stmt.Close()
+	return nil
+}
+
 // GetAttachments returns a slice of Attachment associated with the supplied snip uuid
 func GetAttachments(path string, searchUUID uuid.UUID) ([]Attachment, error) {
 	var attachments []Attachment
