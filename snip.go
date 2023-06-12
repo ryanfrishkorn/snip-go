@@ -17,6 +17,32 @@ type Snip struct {
 	UUID      uuid.UUID
 }
 
+// Attach adds files associated with a snip
+func (s *Snip) Attach(path string, title string, data []byte) error {
+	conn, err := sqlite3.Open(path)
+	if err != nil {
+		return err
+	}
+
+	// build and insert attachment
+	a := NewAttachment()
+	a.Data = data
+	a.Title = title
+	a.SnipUUID = s.UUID
+
+	stmt, err := conn.Prepare(`INSERT INTO snip_attachment (uuid, snip_uuid, timestamp, title, data, size) VALUES (?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	err = stmt.Exec(a.UUID.String(), a.SnipUUID.String(), a.Timestamp.String(), a.Title, a.Data, len(a.Data))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // CountWords returns an integer estimating the number of words in data
 func (s *Snip) CountWords() int {
 	data := FlattenString(string(s.Data))
@@ -42,6 +68,7 @@ func CreateNewDatabase(path string) error {
 
 	// build schema
 	err = conn.Exec(`CREATE TABLE IF NOT EXISTS snip(uuid TEXT, timestamp TEXT, title TEXT, data TEXT)`)
+	err = conn.Exec(`CREATE TABLE IF NOT EXISTS snip_attachment(uuid TEXT, snip_uuid TEXT, timestamp TEXT, title TEXT, data BLOB, size INTEGER)`)
 	if err != nil {
 		return err
 	}

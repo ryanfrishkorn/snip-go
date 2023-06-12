@@ -9,6 +9,7 @@ import (
 	"github.com/ryanfrishkorn/snip"
 	"io"
 	"os"
+	"path"
 	"time"
 )
 
@@ -48,6 +49,9 @@ func main() {
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	addDataFromFile := addCmd.String("f", "", "use data from specified file")
 	addTitle := addCmd.String("t", "", "specify title")
+
+	attachCmd := flag.NewFlagSet("attach", flag.ExitOnError)
+	attachRemove := attachCmd.Bool("rm", false, "remove supplied attachment uuids")
 
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	getRawData := getCmd.Bool("raw", false, "output only raw data")
@@ -112,6 +116,49 @@ func main() {
 			log.Fatal().Err(err).Msg("error inserting Snip into database")
 		}
 		fmt.Printf("successfully added snip with uuid: %s\n", s.UUID)
+
+	case "attach":
+		if err := attachCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatal().Err(err).Msg("error parsing attach arguments")
+		}
+
+		// REMOVE attachments by uuid
+		if *attachRemove == true {
+			for _, attachmentUUID := range attachCmd.Args() {
+				fmt.Printf("removing attachment %s\n", attachmentUUID)
+			}
+			break
+		}
+
+		// check arguments
+		if len(attachCmd.Args()) < 1 {
+			attachCmd.Usage()
+			log.Fatal().Msg("not enough arguments to attach subcommand")
+		}
+
+		// INSERT new attachments
+		id := attachCmd.Args()[0]
+		// validate UUID
+		s, err := snip.GetFromUUID(dbFilePath, id)
+		if err != nil {
+			log.Fatal().Str("uuid", id).Msg("error locating snip uuid")
+		}
+
+		for _, filename := range attachCmd.Args()[1:] {
+			// attempt to insert file
+			data, err := os.ReadFile(filename)
+			if err != nil {
+				log.Fatal().Err(err).Msg("error reading attachment file data")
+			}
+			basename := path.Base(filename)
+			// title is filename if not supplied
+			err = s.Attach(dbFilePath, basename, data)
+			if err != nil {
+				log.Error().Err(err).Str("filename", filename).Msg("error attaching file")
+				continue
+			}
+			fmt.Printf("attached %s %d bytes\n", filename, len(data))
+		}
 
 	case "get":
 		if err := getCmd.Parse(os.Args[2:]); err != nil {
