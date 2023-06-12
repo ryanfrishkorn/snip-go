@@ -33,6 +33,7 @@ func main() {
 	helpOutput := func() {
 		fmt.Printf("valid subcommands:\n")
 		fmt.Printf("  add - add a new snip\n")
+		fmt.Printf("  attach - attach a file to specified snip\n")
 		fmt.Printf("  get - retrieve snip with specified uuid\n")
 		fmt.Printf("  ls - list all snips\n")
 		fmt.Printf("  rm - remove snip <uuid> ...\n")
@@ -183,6 +184,11 @@ func main() {
 			fmt.Printf("----\n")
 			fmt.Printf("%s", s.Data)
 			fmt.Printf("\n----\n")
+			// print attachments if present
+			fmt.Printf("attachments:\n")
+			for idx, a := range s.Attachments {
+				fmt.Printf("  %d - %s %s %d bytes\n", idx, a.UUID.String(), a.Title, a.Size)
+			}
 		}
 
 	case "ls":
@@ -210,8 +216,6 @@ func main() {
 				log.Debug().Str("uuid", arg).Err(err).Msg("error parsing uuid input")
 				continue
 			}
-			// result, err := snip.Delete()
-			// fmt.Println(id)
 			err = snip.Delete(dbFilePath, id)
 			if err != nil {
 				fmt.Printf("ERROR removing %d/%d %s...", idx+1, len(rmCmd.Args()), arg)

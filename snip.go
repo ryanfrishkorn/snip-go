@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/bvinc/go-sqlite-lite/sqlite3"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"regexp"
 	"strings"
 	"time"
@@ -11,10 +12,11 @@ import (
 
 // Snip represents a snippet of data with additional metadata
 type Snip struct {
-	Data      []byte
-	Timestamp time.Time
-	Title     string
-	UUID      uuid.UUID
+	Attachments []Attachment
+	Data        []byte
+	Timestamp   time.Time
+	Title       string
+	UUID        uuid.UUID
 }
 
 // Attach adds files associated with a snip
@@ -95,6 +97,67 @@ func Delete(path string, id uuid.UUID) error {
 	}
 	stmt.Close()
 	return nil
+}
+
+// GetAttachments returns a slice of Attachment associated with the supplied snip uuid
+func GetAttachments(path string, searchUUID uuid.UUID) ([]Attachment, error) {
+	var attachments []Attachment
+
+	ids, err := GetAttachmentsUUIDs(path, searchUUID)
+	if err != nil {
+		return attachments, err
+	}
+	log.Debug()
+
+	for _, id := range ids {
+		a, err := GetAttachmentFromUUID(path, id)
+		if err != nil {
+			return attachments, err
+		}
+		attachments = append(attachments, a)
+	}
+	return attachments, nil
+}
+
+// GetAttachmentsUUIDs returns a slice of attachment uuids associated with supplied snip uuid
+func GetAttachmentsUUIDs(path string, snipUUID uuid.UUID) ([]uuid.UUID, error) {
+	var results []uuid.UUID
+
+	conn, err := sqlite3.Open(path)
+	if err != nil {
+		return results, err
+	}
+	defer conn.Close()
+
+	stmt, err := conn.Prepare(`SELECT uuid FROM snip_attachment WHERE snip_uuid = ?`)
+	if err != nil {
+		return results, err
+	}
+	err = stmt.Exec(snipUUID.String())
+	if err != nil {
+		return results, err
+	}
+
+	resultCount := 0
+	for {
+		hasRow, err := stmt.Step()
+		if !hasRow {
+			break
+		}
+		resultCount++
+
+		var idStr string
+		err = stmt.Scan(&idStr)
+		if err != nil {
+			return results, err
+		}
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return results, err
+		}
+		results = append(results, id)
+	}
+	return results, nil
 }
 
 // FlattenString returns a string with all newline, tabs, and spaces squeezed
@@ -182,6 +245,13 @@ func GetFromUUID(path string, searchUUID string) (Snip, error) {
 	if resultCount == 0 {
 		return s, fmt.Errorf("database search returned zero results")
 	}
+
+	// gather attachments
+	s.Attachments, err = GetAttachments(path, s.UUID)
+	if err != nil {
+		return s, err
+	}
+
 	return s, nil
 }
 
