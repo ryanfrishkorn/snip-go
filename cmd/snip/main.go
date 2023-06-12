@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/ryanfrishkorn/snip"
@@ -33,6 +34,7 @@ func main() {
 		fmt.Printf("  add - add a new snip\n")
 		fmt.Printf("  get - retrieve snip with specified uuid\n")
 		fmt.Printf("  ls - list all snips\n")
+		fmt.Printf("  rm - remove snip <uuid> ...\n")
 		fmt.Printf("  search - return snips whose data contains given term\n")
 		os.Exit(1)
 	}
@@ -56,6 +58,8 @@ func main() {
 	searchCmd := flag.NewFlagSet("search", flag.ExitOnError)
 	// fuzzy data search by default unless field is specified
 	searchField := searchCmd.String("f", "data", "field to search")
+
+	rmCmd := flag.NewFlagSet("rm", flag.ExitOnError)
 
 	// ensure database is present
 	err := snip.CreateNewDatabase(dbFilePath)
@@ -136,7 +140,7 @@ func main() {
 
 	case "ls":
 		if err := listCmd.Parse(os.Args[2:]); err != nil {
-			log.Fatal().Err(err).Msg("error parsing search arguments")
+			log.Fatal().Err(err).Msg("error parsing ls arguments")
 		}
 		results, err := snip.List(dbFilePath, *listLimit)
 		if err != nil {
@@ -145,6 +149,28 @@ func main() {
 		fmt.Printf("results: %d\n", len(results))
 		for _, s := range results {
 			fmt.Printf("%s %s\n", s.UUID, s.Title)
+		}
+
+	case "rm":
+		if err := rmCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatal().Err(err).Msg("error parsing rm arguments")
+		}
+		for idx, arg := range rmCmd.Args() {
+			// parse to uuid because it seems proper
+			id, err := uuid.Parse(arg)
+			if err != nil {
+				fmt.Printf("ERROR removing %d/%d %s...", idx+1, len(rmCmd.Args()), arg)
+				log.Debug().Str("uuid", arg).Err(err).Msg("error parsing uuid input")
+				continue
+			}
+			// result, err := snip.Delete()
+			// fmt.Println(id)
+			err = snip.Delete(dbFilePath, id)
+			if err != nil {
+				fmt.Printf("ERROR removing %d/%d %s...", idx+1, len(rmCmd.Args()), arg)
+				log.Debug().Str("uuid", arg).Err(err).Msg("error while attempting to delete snip")
+			}
+			fmt.Printf("removed %d/%d %s\n", idx+1, len(rmCmd.Args()), arg)
 		}
 
 	case "search":

@@ -49,6 +49,27 @@ func CreateNewDatabase(path string) error {
 	return nil
 }
 
+// Delete removes a snip from the database
+func Delete(path string, id uuid.UUID) error {
+	conn, err := sqlite3.Open(path)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	// remove
+	stmt, err := conn.Prepare(`DELETE from snip WHERE uuid = ? LIMIT 1`, id.String())
+	if err != nil {
+		return err
+	}
+	err = stmt.Exec()
+	if err != nil {
+		return err
+	}
+	stmt.Close()
+	return nil
+}
+
 // FlattenString returns a string with all newline, tabs, and spaces squeezed
 func FlattenString(input string) string {
 	// remove newlines and tabs
