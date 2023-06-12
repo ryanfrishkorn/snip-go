@@ -53,6 +53,7 @@ func main() {
 
 	attachCmd := flag.NewFlagSet("attach", flag.ExitOnError)
 	attachRemove := attachCmd.Bool("rm", false, "remove supplied attachment uuids")
+	attachWrite := attachCmd.Bool("write", false, "write attachment to local file")
 
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	getRawData := getCmd.Bool("raw", false, "output only raw data")
@@ -128,6 +129,34 @@ func main() {
 			for _, attachmentUUID := range attachCmd.Args() {
 				fmt.Printf("removing attachment %s\n", attachmentUUID)
 			}
+			break
+		}
+
+		// WRITE attachment to file
+		if *attachWrite == true {
+			var outfile string
+
+			if len(attachCmd.Args()) == 0 || len(attachCmd.Args()) > 2 {
+				log.Fatal().Msg("writing attachment action requires one or two arguments")
+			}
+
+			idStr := attachCmd.Args()[0]
+			id, err := uuid.Parse(idStr)
+			if err != nil {
+				log.Fatal().Err(err).Msg("error parsing uuid")
+			}
+			a, err := snip.GetAttachmentFromUUID(dbFilePath, id)
+			// assign outfile name or use saved name if omitted
+			if len(attachCmd.Args()) == 2 {
+				outfile = attachCmd.Args()[1]
+			} else {
+				outfile = a.Title
+			}
+			bytesWritten, err := snip.WriteAttachment(dbFilePath, a.UUID, outfile)
+			if err != nil {
+				log.Fatal().Err(err).Msg("error writing attachment to file")
+			}
+			fmt.Printf("%s written to %s %d bytes\n", a.Title, outfile, bytesWritten)
 			break
 		}
 

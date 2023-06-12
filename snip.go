@@ -5,6 +5,7 @@ import (
 	"github.com/bvinc/go-sqlite-lite/sqlite3"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -432,4 +433,31 @@ func SearchUUID(path string, term string) ([]Snip, error) {
 		searchResult = append(searchResult, s)
 	}
 	return searchResult, nil
+}
+
+// WriteAttachment writes the attached file to the current working directory
+func WriteAttachment(path string, id uuid.UUID, outfile string) (int, error) {
+	a, err := GetAttachmentFromUUID(path, id)
+	if err != nil {
+		log.Debug().Err(err).Str("uuid", id.String()).Msg("error obtaining attachment from id")
+		return 0, err
+	}
+	// attempt to open file for writing using filename
+	// never overwrite data
+	_, err = os.Stat(outfile)
+	if err == nil {
+		log.Debug().Str("filename", a.Title).Msg("stat returned no errors, refusing to overwrite file")
+		return 0, fmt.Errorf("refusing to overwrite file")
+	}
+	f, err := os.Create(outfile)
+	if err != nil {
+		log.Debug().Err(err).Msg("error opening new file for writing")
+		return 0, err
+	}
+	bytesWritten, err := f.Write(a.Data)
+	if err != nil {
+		log.Debug().Err(err).Str("filename", a.Title).Msg("error attempting to write data to file")
+		return 0, err
+	}
+	return bytesWritten, err
 }
