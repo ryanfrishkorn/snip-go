@@ -19,17 +19,11 @@ type Attachment struct {
 }
 
 // GetAttachmentMetadata returns all fields except Data for analysis without large memory use
-func GetAttachmentMetadata(path string, searchUUID uuid.UUID) (Attachment, error) {
+func GetAttachmentMetadata(conn *sqlite3.Conn, searchUUID uuid.UUID) (Attachment, error) {
 	a := Attachment{}
 
-	conn, err := sqlite3.Open(path)
-	if err != nil {
-		return a, err
-	}
-	defer conn.Close()
-
 	var stmt *sqlite3.Stmt
-	stmt, err = conn.Prepare(`SELECT size, snip_uuid, timestamp, title FROM snip_attachment WHERE uuid = ?`, searchUUID.String())
+	stmt, err := conn.Prepare(`SELECT size, snip_uuid, timestamp, title FROM snip_attachment WHERE uuid = ?`, searchUUID.String())
 	if err != nil {
 		return a, err
 	}
@@ -75,17 +69,11 @@ func GetAttachmentMetadata(path string, searchUUID uuid.UUID) (Attachment, error
 	return a, nil
 }
 
-func GetAttachmentFromUUID(path string, searchUUID uuid.UUID) (Attachment, error) {
+func GetAttachmentFromUUID(conn *sqlite3.Conn, searchUUID uuid.UUID) (Attachment, error) {
 	a := Attachment{}
 
-	conn, err := sqlite3.Open(path)
-	if err != nil {
-		return a, err
-	}
-	defer conn.Close()
-
 	var stmt *sqlite3.Stmt
-	stmt, err = conn.Prepare(`SELECT data, size, snip_uuid, timestamp, title FROM snip_attachment WHERE uuid = ?`, searchUUID.String())
+	stmt, err := conn.Prepare(`SELECT data, size, snip_uuid, timestamp, title FROM snip_attachment WHERE uuid = ?`, searchUUID.String())
 	if err != nil {
 		return a, err
 	}

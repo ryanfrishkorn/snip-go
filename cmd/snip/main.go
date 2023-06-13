@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/bvinc/go-sqlite-lite/sqlite3"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -69,8 +70,14 @@ func main() {
 
 	rmCmd := flag.NewFlagSet("rm", flag.ExitOnError)
 
+	conn, err := sqlite3.Open(dbFilePath)
+	if err != nil {
+		log.Fatal().Err(err).Msg("error opening database")
+	}
+	defer conn.Close()
+
 	// ensure database is present
-	err := snip.CreateNewDatabase(dbFilePath)
+	err = snip.CreateNewDatabase(conn)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error opening database")
 	}
@@ -115,7 +122,7 @@ func main() {
 			Str("title", s.Title).
 			Bytes("Data", s.Data).
 			Msg("first snip object")
-		err = snip.InsertSnip(dbFilePath, s)
+		err = snip.InsertSnip(conn, s)
 		if err != nil {
 			log.Fatal().Err(err).Msg("error inserting Snip into database")
 		}
@@ -128,7 +135,7 @@ func main() {
 
 		// LIST attachments with additional info
 		if *attachList == true {
-			list, err := snip.GetAttachmentsAll(dbFilePath)
+			list, err := snip.GetAttachmentsAll(conn)
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not list all attachments")
 			}
@@ -136,7 +143,7 @@ func main() {
 			// use this function to not load overhead of Data field since it will not be used
 			var attachments []snip.Attachment
 			for _, id := range list {
-				a, err := snip.GetAttachmentMetadata(dbFilePath, id)
+				a, err := snip.GetAttachmentMetadata(conn, id)
 				if err != nil {
 					log.Fatal().Err(err).Str("uuid", id.String()).Msg("error getting attachment metadata")
 				}
@@ -164,7 +171,7 @@ func main() {
 					log.Error().Err(err).Str("uuid", "idStr").Msg("error parsing uuid")
 					fmt.Fprintf(os.Stderr, "could not parse attachment %s", idStr)
 				}
-				err = snip.DeleteAttachment(dbFilePath, id)
+				err = snip.DeleteAttachment(conn, id)
 				if err != nil {
 					log.Error().Err(err).Str("uuid", idStr).Msg("error removing attachment")
 					fmt.Fprintf(os.Stderr, "could not delete attachment %s", idStr)
@@ -188,14 +195,14 @@ func main() {
 			if err != nil {
 				log.Fatal().Err(err).Msg("error parsing uuid")
 			}
-			a, err := snip.GetAttachmentFromUUID(dbFilePath, id)
+			a, err := snip.GetAttachmentFromUUID(conn, id)
 			// assign outfile name or use saved name if omitted
 			if len(attachCmd.Args()) == 2 {
 				outfile = attachCmd.Args()[1]
 			} else {
 				outfile = a.Title
 			}
-			bytesWritten, err := snip.WriteAttachment(dbFilePath, a.UUID, outfile)
+			bytesWritten, err := snip.WriteAttachment(conn, a.UUID, outfile)
 			if err != nil {
 				log.Fatal().Err(err).Msg("error writing attachment to file")
 			}
@@ -212,7 +219,7 @@ func main() {
 		// INSERT new attachments
 		id := attachCmd.Args()[0]
 		// validate UUID
-		s, err := snip.GetFromUUID(dbFilePath, id)
+		s, err := snip.GetFromUUID(conn, id)
 		if err != nil {
 			log.Fatal().Str("uuid", id).Msg("error locating snip uuid")
 		}
@@ -225,7 +232,7 @@ func main() {
 			}
 			basename := path.Base(filename)
 			// title is filename if not supplied
-			err = s.Attach(dbFilePath, basename, data)
+			err = s.Attach(conn, basename, data)
 			if err != nil {
 				log.Error().Err(err).Str("filename", filename).Msg("error attaching file")
 				continue
@@ -241,7 +248,7 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Msg("error converting from bytes to uuid type")
 		}
-		s, err := snip.GetFromUUID(dbFilePath, idStr)
+		s, err := snip.GetFromUUID(conn, idStr)
 		if err != nil {
 			log.Fatal().Err(err).Str("uuid", idStr).Msg("error retrieving snip with uuid")
 		}
@@ -267,7 +274,7 @@ func main() {
 		if err := listCmd.Parse(os.Args[2:]); err != nil {
 			log.Fatal().Err(err).Msg("error parsing ls arguments")
 		}
-		results, err := snip.List(dbFilePath, *listLimit)
+		results, err := snip.List(conn, *listLimit)
 		if err != nil {
 			log.Fatal().Err(err).Msg("error listing items")
 		}
@@ -288,7 +295,7 @@ func main() {
 				log.Debug().Str("uuid", arg).Err(err).Msg("error parsing uuid input")
 				continue
 			}
-			err = snip.Delete(dbFilePath, id)
+			err = snip.Delete(conn, id)
 			if err != nil {
 				fmt.Printf("ERROR removing %d/%d %s...", idx+1, len(rmCmd.Args()), arg)
 				log.Debug().Str("uuid", arg).Err(err).Msg("error while attempting to delete snip")
@@ -306,13 +313,13 @@ func main() {
 		fmt.Printf("searching data field for: %s\n", term)
 		switch *searchField {
 		case "data":
-			results, err = snip.SearchDataTerm(dbFilePath, term)
+			results, err = snip.SearchDataTerm(conn, term)
 			if err != nil {
 				log.Fatal().Err(err).Msg("error while searching for term")
 			}
 
 		case "uuid":
-			results, err = snip.SearchUUID(dbFilePath, term)
+			results, err = snip.SearchUUID(conn, term)
 			if err != nil {
 				log.Fatal().Err(err).Msg("error while searching for term")
 			}
