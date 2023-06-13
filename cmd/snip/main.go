@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"sort"
 	"time"
 )
 
@@ -52,6 +53,7 @@ func main() {
 	addTitle := addCmd.String("t", "", "specify title")
 
 	attachCmd := flag.NewFlagSet("attach", flag.ExitOnError)
+	attachList := attachCmd.Bool("ls", false, "list all attachments")
 	attachRemove := attachCmd.Bool("rm", false, "remove supplied attachment uuids")
 	attachWrite := attachCmd.Bool("write", false, "write attachment to local file")
 
@@ -122,6 +124,36 @@ func main() {
 	case "attach":
 		if err := attachCmd.Parse(os.Args[2:]); err != nil {
 			log.Fatal().Err(err).Msg("error parsing attach arguments")
+		}
+
+		// LIST attachments with additional info
+		if *attachList == true {
+			list, err := snip.GetAttachmentsAll(dbFilePath)
+			if err != nil {
+				log.Fatal().Err(err).Msg("could not list all attachments")
+			}
+			// build list
+			// use this function to not load overhead of Data field since it will not be used
+			var attachments []snip.Attachment
+			for _, id := range list {
+				a, err := snip.GetAttachmentMetadata(dbFilePath, id)
+				if err != nil {
+					log.Fatal().Err(err).Str("uuid", id.String()).Msg("error getting attachment metadata")
+				}
+				attachments = append(attachments, a)
+			}
+			// sorting should occur here
+			sort.Slice(attachments, func(i, j int) bool {
+				// this is deliberate reversal to sort the largest items first
+				return attachments[i].Size > attachments[j].Size
+			})
+
+			// print analysis
+			fmt.Printf("%s %36s %9s %s\n", "count", "uuid", "size", "filename")
+			for idx, a := range attachments {
+				fmt.Printf("%5d %s %9d %s\n", idx+1, a.UUID, a.Size, truncateStr(a.Title, 60))
+			}
+			break
 		}
 
 		// REMOVE attachments by uuid
@@ -315,4 +347,27 @@ func readFromStdin() ([]byte, error) {
 		return []byte{}, err
 	}
 	return data, nil
+}
+
+// truncateStr returns a new string limited to max chars
+func truncateStr(text string, max int) string {
+	// trade empty for empty
+	if len(text) == 0 {
+		return ""
+	}
+
+	cutoff := max
+	suffix := false
+	if len(text) > max {
+		suffix = true
+		cutoff = max - 3
+	}
+	if suffix == true {
+		if len(text) <= cutoff {
+			return text + "..."
+		} else {
+			return text[:cutoff] + "..."
+		}
+	}
+	return text
 }

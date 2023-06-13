@@ -121,6 +121,48 @@ func DeleteAttachment(path string, id uuid.UUID) error {
 	return nil
 }
 
+// GetAllAttachments returns a slice of uuids for all attachments in the system
+func GetAttachmentsAll(path string) ([]uuid.UUID, error) {
+	var attachmentIDs []uuid.UUID
+
+	conn, err := sqlite3.Open(path)
+	if err != nil {
+		return attachmentIDs, err
+	}
+	defer conn.Close()
+
+	stmt, err := conn.Prepare(`SELECT uuid from snip_attachment`)
+	if err != nil {
+		return attachmentIDs, err
+	}
+	err = stmt.Exec()
+	if err != nil {
+		return attachmentIDs, err
+	}
+	defer stmt.Close()
+
+	for {
+		hasRow, err := stmt.Step()
+		if err != nil {
+			return attachmentIDs, err
+		}
+		if !hasRow {
+			break
+		}
+		var idStr string
+		err = stmt.Scan(&idStr)
+		if err != nil {
+			return attachmentIDs, err
+		}
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return attachmentIDs, err
+		}
+		attachmentIDs = append(attachmentIDs, id)
+	}
+	return attachmentIDs, nil
+}
+
 // GetAttachments returns a slice of Attachment associated with the supplied snip uuid
 func GetAttachments(path string, searchUUID uuid.UUID) ([]Attachment, error) {
 	var attachments []Attachment
@@ -400,6 +442,7 @@ func SearchDataTerm(path string, term string) ([]Snip, error) {
 		var idStr string
 		err = stmt.Scan(&idStr)
 		if err != nil {
+			// TODO revisit this logic, why not return error?
 			break
 		}
 
