@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/ryanfrishkorn/snip"
 	"io"
+	"math/rand"
 	"os"
 	"path"
 	"sort"
@@ -60,9 +61,9 @@ func main() {
 
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	getRawData := getCmd.Bool("raw", false, "output only raw data")
+	getRandom := getCmd.Bool("random", false, "view a random snip")
 
 	listCmd := flag.NewFlagSet("ls", flag.ExitOnError)
-	listLimit := listCmd.Int("l", 0, "limit results")
 
 	searchCmd := flag.NewFlagSet("search", flag.ExitOnError)
 	// fuzzy data search by default unless field is specified
@@ -244,7 +245,35 @@ func main() {
 		if err := getCmd.Parse(os.Args[2:]); err != nil {
 			log.Fatal().Err(err).Msg("error parsing get arguments")
 		}
-		idStr := getCmd.Args()[0]
+		var idStr string
+
+		// random from all snips
+		if *getRandom == true {
+			fmt.Fprintf(os.Stderr, "getting random snip\n")
+			// get list
+			allSnips, err := snip.List(conn, 0)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error listing all snips: %v", err)
+				log.Fatal().Err(err).Msg("error retrieving all snips")
+			}
+
+			// get random within range
+			src := rand.NewSource(time.Now().UnixNano())
+			r := rand.New(src)
+			index := r.Intn(len(allSnips))
+			log.Debug().Int("random index", index).Msg("generated random integer")
+			// assign to outside world
+			idStr = allSnips[index].UUID.String()
+		}
+
+		// obtain uuid specified from argument
+		if idStr == "" {
+			if len(getCmd.Args()) < 1 {
+				getCmd.Usage()
+				os.Exit(1)
+			}
+			idStr = getCmd.Args()[0]
+		}
 		if err != nil {
 			log.Fatal().Err(err).Msg("error converting from bytes to uuid type")
 		}
@@ -274,12 +303,17 @@ func main() {
 		if err := listCmd.Parse(os.Args[2:]); err != nil {
 			log.Fatal().Err(err).Msg("error parsing ls arguments")
 		}
-		results, err := snip.List(conn, *listLimit)
+		results, err := snip.GetAllMetadata(conn)
 		if err != nil {
 			log.Fatal().Err(err).Msg("error listing items")
 		}
 		fmt.Printf("results: %d\n", len(results))
-		for _, s := range results {
+		for _, id := range results {
+			s, err := snip.GetFromUUID(conn, id.String())
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error getting snip uuid: %s\n", id.String())
+				log.Fatal().Err(err).Str("uuid", s.UUID.String()).Msg("error parsing uuid")
+			}
 			fmt.Printf("%s %s\n", s.UUID, s.Title)
 		}
 

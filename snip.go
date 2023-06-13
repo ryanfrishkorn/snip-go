@@ -98,6 +98,41 @@ func DeleteAttachment(conn *sqlite3.Conn, id uuid.UUID) error {
 	return nil
 }
 
+func GetAllMetadata(conn *sqlite3.Conn) ([]uuid.UUID, error) {
+	var snipIDs []uuid.UUID
+
+	stmt, err := conn.Prepare(`SELECT uuid from snip`)
+	if err != nil {
+		return snipIDs, err
+	}
+	err = stmt.Exec()
+	if err != nil {
+		return snipIDs, err
+	}
+	defer stmt.Close()
+
+	for {
+		hasRow, err := stmt.Step()
+		if err != nil {
+			return snipIDs, err
+		}
+		if !hasRow {
+			break
+		}
+		var idStr string
+		err = stmt.Scan(&idStr)
+		if err != nil {
+			return snipIDs, err
+		}
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return snipIDs, err
+		}
+		snipIDs = append(snipIDs, id)
+	}
+	return snipIDs, nil
+}
+
 // GetAllAttachments returns a slice of uuids for all attachments in the system
 func GetAttachmentsAll(conn *sqlite3.Conn) ([]uuid.UUID, error) {
 	var attachmentIDs []uuid.UUID
@@ -138,7 +173,7 @@ func GetAttachmentsAll(conn *sqlite3.Conn) ([]uuid.UUID, error) {
 func GetAttachments(conn *sqlite3.Conn, searchUUID uuid.UUID) ([]Attachment, error) {
 	var attachments []Attachment
 
-	ids, err := GetAttachmentsUUIDs(conn, searchUUID)
+	ids, err := GetAttachmentsUUID(conn, searchUUID)
 	if err != nil {
 		return attachments, err
 	}
@@ -154,8 +189,8 @@ func GetAttachments(conn *sqlite3.Conn, searchUUID uuid.UUID) ([]Attachment, err
 	return attachments, nil
 }
 
-// GetAttachmentsUUIDs returns a slice of attachment uuids associated with supplied snip uuid
-func GetAttachmentsUUIDs(conn *sqlite3.Conn, snipUUID uuid.UUID) ([]uuid.UUID, error) {
+// GetSnipAttachments returns a slice of attachment uuids associated with supplied snip uuid
+func GetAttachmentsUUID(conn *sqlite3.Conn, snipUUID uuid.UUID) ([]uuid.UUID, error) {
 	var results []uuid.UUID
 
 	stmt, err := conn.Prepare(`SELECT uuid FROM snip_attachment WHERE snip_uuid = ?`)
