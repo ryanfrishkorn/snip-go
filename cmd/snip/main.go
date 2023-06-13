@@ -157,9 +157,9 @@ func main() {
 			})
 
 			// print analysis
-			fmt.Printf("%s %36s %9s %s\n", "count", "uuid", "size", "filename")
+			fmt.Printf("%s %s %42s %s\n", "count", "uuid", "size", "filename")
 			for idx, a := range attachments {
-				fmt.Printf("%5d %s %9d %s\n", idx+1, a.UUID, a.Size, truncateStr(a.Title, 60))
+				fmt.Printf("%5d %s %10d %s\n", idx+1, a.UUID, a.Size, truncateStr(a.Title, 60))
 			}
 			break
 		}
