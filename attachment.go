@@ -30,6 +30,7 @@ func GetAttachmentMetadata(searchUUID uuid.UUID) (Attachment, error) {
 	}
 	defer stmt.Close()
 
+	err = stmt.Exec()
 	if err != nil {
 		return a, err
 	}

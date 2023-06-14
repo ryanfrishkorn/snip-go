@@ -86,7 +86,7 @@ func Delete(id uuid.UUID) error {
 		}
 	}
 	// remove
-	stmt, err := database.Conn.Prepare(`DELETE from snip WHERE uuid = ? LIMIT 1`, id.String())
+	stmt, err := database.Conn.Prepare(`DELETE from snip WHERE uuid = ?`, id.String())
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func Delete(id uuid.UUID) error {
 // DeleteAttachment deletes an attachment from the database
 func DeleteAttachment(id uuid.UUID) error {
 	// remove
-	stmt, err := database.Conn.Prepare(`DELETE from snip_attachment WHERE uuid = ? LIMIT 1`, id.String())
+	stmt, err := database.Conn.Prepare(`DELETE from snip_attachment WHERE uuid = '?'`, id.String())
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func GetAllMetadata() ([]uuid.UUID, error) {
 	return snipIDs, nil
 }
 
-// GetAllAttachments returns a slice of uuids for all attachments in the system
+// GetAttachmentsAll returns a slice of uuids for all attachments in the system
 func GetAttachmentsAll() ([]uuid.UUID, error) {
 	var attachmentIDs []uuid.UUID
 
@@ -204,7 +204,7 @@ func GetAttachments(searchUUID uuid.UUID) ([]Attachment, error) {
 	return attachments, nil
 }
 
-// GetSnipAttachments returns a slice of attachment uuids associated with supplied snip uuid
+// GetAttachmentsUUID returns a slice of attachment uuids associated with supplied snip uuid
 func GetAttachmentsUUID(snipUUID uuid.UUID) ([]uuid.UUID, error) {
 	var results []uuid.UUID
 
