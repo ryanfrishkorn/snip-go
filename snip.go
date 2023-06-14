@@ -60,6 +60,9 @@ func (s *Snip) GenerateTitle(wordCount int) string {
 func CreateNewDatabase(conn *sqlite3.Conn) error {
 	// build schema
 	err := conn.Exec(`CREATE TABLE IF NOT EXISTS snip(uuid TEXT, timestamp TEXT, title TEXT, data TEXT)`)
+	if err != nil {
+		return err
+	}
 	err = conn.Exec(`CREATE TABLE IF NOT EXISTS snip_attachment(uuid TEXT, snip_uuid TEXT, timestamp TEXT, title TEXT, data BLOB, size INTEGER)`)
 	if err != nil {
 		return err
