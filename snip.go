@@ -70,6 +70,17 @@ func CreateNewDatabase(conn *sqlite3.Conn) error {
 
 // Delete removes a snip from the database
 func Delete(conn *sqlite3.Conn, id uuid.UUID) error {
+	// remove associated attachments
+	attachments, err := GetAttachments(conn, id)
+	if err != nil {
+		return err
+	}
+	for _, a := range attachments {
+		err = DeleteAttachment(conn, a.UUID)
+		if err != nil {
+			return err
+		}
+	}
 	// remove
 	stmt, err := conn.Prepare(`DELETE from snip WHERE uuid = ? LIMIT 1`, id.String())
 	if err != nil {
