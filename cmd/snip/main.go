@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -34,30 +35,38 @@ func main() {
 	dbFilePath := homePath + "/" + dbFilename
 
 	helpOutput := func() {
-		fmt.Printf("valid subcommands:\n")
-		fmt.Printf("  add - add a new snip\n")
-		fmt.Printf("  attach - attach a file to specified snip\n")
-		fmt.Printf("  get - retrieve snip with specified uuid\n")
-		fmt.Printf("  ls - list all snips\n")
-		fmt.Printf("  rm - remove snip <uuid> ...\n")
-		fmt.Printf("  search - return snips whose data contains given term\n")
+		fmt.Printf("usage:\n")
+		fmt.Printf("snip add                      add a new snip from standard input\n")
+		fmt.Printf("       -f <file>              data from file instead of stdin default\n")
+		fmt.Printf("       -t <title>             use specified title\n")
+		fmt.Println()
+		fmt.Printf("snip attach                   attach a file to specified snip\n")
+		fmt.Printf("       add <uuid> <file ...>  add attachment files to snip\n")
+		fmt.Printf("       list                   list all attachments in database\n")
+		fmt.Printf("         -sort <size|title>   sort by snip field (default: title)\n")
+		fmt.Println()
+		fmt.Printf("snip get <uuid>               retrieve snip with specified uuid\n")
+		fmt.Printf("       -raw                   output only raw data from snip\n")
+		fmt.Println()
+		fmt.Printf("snip ls                       list all snips\n")
+		fmt.Println()
+		fmt.Printf("snip search <term>            return snips whose data contains given term\n")
+		fmt.Printf("       -f <field>             search snip field\n")
+		fmt.Println()
+		fmt.Printf("snip rm <uuid ...>            remove snip <uuid> ...\n")
 		os.Exit(1)
 	}
-
-	// establish action
-	if len(os.Args) < 2 {
-		helpOutput()
-	}
-	action := os.Args[1]
 
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	addDataFromFile := addCmd.String("f", "", "use data from specified file")
 	addTitle := addCmd.String("t", "", "specify title")
 
 	attachCmd := flag.NewFlagSet("attach", flag.ExitOnError)
-	attachList := attachCmd.Bool("ls", false, "list all attachments")
-	attachRemove := attachCmd.Bool("rm", false, "remove supplied attachment uuids")
-	attachWrite := attachCmd.Bool("write", false, "write attachment to local file")
+	attachAddCmd := flag.NewFlagSet("add", flag.ExitOnError)
+	attachListCmd := flag.NewFlagSet("ls", flag.ExitOnError)
+	attachListSort := attachListCmd.String("sort", "title", "field to sort attachment list by")
+	attachRemoveCmd := flag.NewFlagSet("rm", flag.ExitOnError)
+	attachWriteCmd := flag.NewFlagSet("write", flag.ExitOnError)
 
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	getRawData := getCmd.Bool("raw", false, "output only raw data")
@@ -70,6 +79,12 @@ func main() {
 	searchField := searchCmd.String("f", "data", "field to search")
 
 	rmCmd := flag.NewFlagSet("rm", flag.ExitOnError)
+
+	// establish action
+	if len(os.Args) < 2 {
+		helpOutput()
+	}
+	action := os.Args[1]
 
 	conn, err := sqlite3.Open(dbFilePath)
 	if err != nil {
@@ -135,7 +150,49 @@ func main() {
 		}
 
 		// LIST attachments with additional info
-		if *attachList == true {
+		switch attachCmd.Args()[0] {
+		case "add":
+			// attachAddCmd
+			if err := attachAddCmd.Parse(attachCmd.Args()[1:]); err != nil {
+				log.Fatal().Err(err).Msg("error parsing attach list arguments")
+			}
+
+			// should always have two arguments, uuid and at least one file
+			if len(attachAddCmd.Args()) != 2 {
+				log.Debug().Int("length", len(attachAddCmd.Args())).Msg("argument length")
+				log.Debug().Str("args", strings.Join(attachAddCmd.Args(), " ")).Msg("arguments")
+				attachAddCmd.Usage()
+				os.Exit(1)
+			}
+			// INSERT new attachments
+			id := attachAddCmd.Args()[0]
+			fmt.Println("id: ", id)
+			// validate UUID
+			s, err := snip.GetFromUUID(conn, id)
+			if err != nil {
+				log.Fatal().Str("uuid", id).Msg("error locating snip uuid")
+			}
+
+			for _, filename := range attachAddCmd.Args()[1:] {
+				// attempt to insert file
+				data, err := os.ReadFile(filename)
+				if err != nil {
+					log.Fatal().Err(err).Msg("error reading attachment file data")
+				}
+				basename := path.Base(filename)
+				// title is filename if not supplied
+				err = s.Attach(conn, basename, data)
+				if err != nil {
+					log.Error().Err(err).Str("filename", filename).Msg("error attaching file")
+					continue
+				}
+				fmt.Printf("attached %s %d bytes\n", filename, len(data))
+			}
+		case "ls":
+			if err := attachListCmd.Parse(attachCmd.Args()[1:]); err != nil {
+				log.Fatal().Err(err).Msg("error parsing attach list arguments")
+			}
+
 			list, err := snip.GetAttachmentsAll(conn)
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not list all attachments")
@@ -150,23 +207,33 @@ func main() {
 				}
 				attachments = append(attachments, a)
 			}
-			// sorting should occur here
-			sort.Slice(attachments, func(i, j int) bool {
-				// this is deliberate reversal to sort the largest items first
-				return attachments[i].Size > attachments[j].Size
-			})
+
+			switch *attachListSort {
+			case "size":
+				sort.Slice(attachments, func(i, j int) bool {
+					// this is deliberate reversal to sort the largest items first
+					return attachments[i].Size > attachments[j].Size
+				})
+			default:
+				fmt.Println("*attachListSort: ", *attachListSort)
+				sort.Slice(attachments, func(i, j int) bool {
+					// this is deliberate reversal to sort the largest items first
+					return attachments[i].Title < attachments[j].Title
+				})
+			}
 
 			// print analysis
-			fmt.Printf("%s %s %42s %s\n", "count", "uuid", "size", "filename")
+			fmt.Printf("%s %s %42s %s\n", "count", "uuid", "size", "title")
 			for idx, a := range attachments {
 				fmt.Printf("%5d %s %10d %s\n", idx+1, a.UUID, a.Size, truncateStr(a.Title, 60))
 			}
-			break
-		}
 
 		// REMOVE attachments by uuid
-		if *attachRemove == true {
-			for _, idStr := range attachCmd.Args() {
+		case "rm":
+			if err := attachRemoveCmd.Parse(attachCmd.Args()); err != nil {
+				log.Fatal().Err(err).Msg("error parsing attach remove arguments")
+			}
+			for _, idStr := range attachRemoveCmd.Args() {
 				id, err := uuid.Parse(idStr)
 				if err != nil {
 					log.Error().Err(err).Str("uuid", "idStr").Msg("error parsing uuid")
@@ -180,26 +247,29 @@ func main() {
 					fmt.Printf("removed attachment %s\n", id)
 				}
 			}
-			break
-		}
 
 		// WRITE attachment to file
-		if *attachWrite == true {
-			var outfile string
-
-			if len(attachCmd.Args()) == 0 || len(attachCmd.Args()) > 2 {
+		case "write":
+			if err := attachWriteCmd.Parse(attachCmd.Args()[1:]); err != nil {
+				log.Fatal().Err(err).Msg("error parsing attach remove arguments")
+			}
+			log.Debug().Str("args", strings.Join(attachWriteCmd.Args(), " ")).Msg("arguments")
+			if len(attachWriteCmd.Args()) == 0 || len(attachWriteCmd.Args()) > 2 {
+				attachWriteCmd.Usage()
 				log.Fatal().Msg("writing attachment action requires one or two arguments")
 			}
 
-			idStr := attachCmd.Args()[0]
+			var outfile string
+
+			idStr := attachWriteCmd.Args()[0]
 			id, err := uuid.Parse(idStr)
 			if err != nil {
 				log.Fatal().Err(err).Msg("error parsing uuid")
 			}
 			a, err := snip.GetAttachmentFromUUID(conn, id)
 			// assign outfile name or use saved name if omitted
-			if len(attachCmd.Args()) == 2 {
-				outfile = attachCmd.Args()[1]
+			if len(attachWriteCmd.Args()) == 2 {
+				outfile = attachWriteCmd.Args()[1]
 			} else {
 				outfile = a.Title
 			}
@@ -208,37 +278,7 @@ func main() {
 				log.Fatal().Err(err).Msg("error writing attachment to file")
 			}
 			fmt.Printf("%s written to %s %d bytes\n", a.Title, outfile, bytesWritten)
-			break
-		}
 
-		// check arguments
-		if len(attachCmd.Args()) < 1 {
-			attachCmd.Usage()
-			log.Fatal().Msg("not enough arguments to attach subcommand")
-		}
-
-		// INSERT new attachments
-		id := attachCmd.Args()[0]
-		// validate UUID
-		s, err := snip.GetFromUUID(conn, id)
-		if err != nil {
-			log.Fatal().Str("uuid", id).Msg("error locating snip uuid")
-		}
-
-		for _, filename := range attachCmd.Args()[1:] {
-			// attempt to insert file
-			data, err := os.ReadFile(filename)
-			if err != nil {
-				log.Fatal().Err(err).Msg("error reading attachment file data")
-			}
-			basename := path.Base(filename)
-			// title is filename if not supplied
-			err = s.Attach(conn, basename, data)
-			if err != nil {
-				log.Error().Err(err).Str("filename", filename).Msg("error attaching file")
-				continue
-			}
-			fmt.Printf("attached %s %d bytes\n", filename, len(data))
 		}
 
 	case "get":
