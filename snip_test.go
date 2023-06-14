@@ -5,28 +5,28 @@ import (
 	"fmt"
 	"github.com/bvinc/go-sqlite-lite/sqlite3"
 	"github.com/google/uuid"
+	"github.com/ryanfrishkorn/snip/database"
 	"os"
 	"strings"
 	"testing"
 )
 
-var DATABASE_PATH = "test.sqlite3"
-var UUID_TEST = uuid.New()
-var DATA_TEST = []byte("this is VeRy UnIQu3 sample data")
-var conn *sqlite3.Conn
+var DatabasePath = "test.sqlite3"
+var UUIDTest = uuid.New()
+var DataTest = []byte("this is VeRy UnIQu3 sample data")
 
 func TestMain(m *testing.M) {
 	var err error
-	conn, err = sqlite3.Open(DATABASE_PATH)
+	database.Conn, err = sqlite3.Open(DatabasePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error opening sqlite test database")
 	}
 	code := m.Run()
 
 	// remove database after all tests have run
-	err = os.Remove(DATABASE_PATH)
+	err = os.Remove(DatabasePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error removing temporary testing database %s: %v", DATABASE_PATH, err)
+		fmt.Fprintf(os.Stderr, "error removing temporary testing database %s: %v", DatabasePath, err)
 	}
 	os.Exit(code)
 }
@@ -44,14 +44,14 @@ func TestNew(t *testing.T) {
 }
 
 func TestCreateNewDatabase(t *testing.T) {
-	err := CreateNewDatabase(conn)
+	err := CreateNewDatabase()
 	if err != nil {
 		t.Errorf("error creating new sqlite database: %v", err)
 	}
 }
 
 func TestInsertSnip(t *testing.T) {
-	err := CreateNewDatabase(conn)
+	err := CreateNewDatabase()
 	if err != nil {
 		t.Errorf("error createing new sqlite database: %v", err)
 	}
@@ -60,28 +60,28 @@ func TestInsertSnip(t *testing.T) {
 	if err != nil {
 		t.Errorf("error creating new snip")
 	}
-	s.Data = []byte(DATA_TEST)
+	s.Data = []byte(DataTest)
 
 	// hijack for testing
-	s.UUID = UUID_TEST
-	err = InsertSnip(conn, s)
+	s.UUID = UUIDTest
+	err = InsertSnip(s)
 	if err != nil {
 		t.Errorf("error inserting snip: %v", err)
 	}
 }
 
 func TestGetFromUUID(t *testing.T) {
-	s, err := GetFromUUID(conn, UUID_TEST.String())
+	s, err := GetFromUUID(UUIDTest.String())
 	if err != nil {
-		t.Errorf("error retrieving uuid %s: %v", UUID_TEST, err)
+		t.Errorf("error retrieving uuid %s: %v", UUIDTest, err)
 	}
 
 	// check integrity
-	if s.UUID != UUID_TEST {
-		t.Errorf("expected UUID of %s, got %s", UUID_TEST.String(), s.UUID.String())
+	if s.UUID != UUIDTest {
+		t.Errorf("expected UUID of %s, got %s", UUIDTest.String(), s.UUID.String())
 	}
-	if bytes.Compare(s.Data, DATA_TEST) != 0 {
-		t.Errorf("expected snip data and DATA_TEST to be equal, Compare returned non-zero")
+	if bytes.Compare(s.Data, DataTest) != 0 {
+		t.Errorf("expected snip data and DataTest to be equal, Compare returned non-zero")
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/ryanfrishkorn/snip"
+	"github.com/ryanfrishkorn/snip/database"
 	"io"
 	"math/rand"
 	"os"
@@ -89,14 +90,15 @@ snip rm <uuid ...>            remove snip <uuid> ...
 	}
 	action := os.Args[1]
 
-	conn, err := sqlite3.Open(dbFilePath)
+	var err error
+	database.Conn, err = sqlite3.Open(dbFilePath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error opening database")
 	}
-	defer conn.Close()
+	defer database.Conn.Close()
 
 	// ensure database is present
-	err = snip.CreateNewDatabase(conn)
+	err = snip.CreateNewDatabase()
 	if err != nil {
 		log.Fatal().Err(err).Msg("error opening database")
 	}
@@ -141,7 +143,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			Str("title", s.Title).
 			Bytes("Data", s.Data).
 			Msg("first snip object")
-		err = snip.InsertSnip(conn, s)
+		err = snip.InsertSnip(s)
 		if err != nil {
 			log.Fatal().Err(err).Msg("error inserting Snip into database")
 		}
@@ -171,7 +173,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			id := attachAddCmd.Args()[0]
 			fmt.Println("id: ", id)
 			// validate UUID
-			s, err := snip.GetFromUUID(conn, id)
+			s, err := snip.GetFromUUID(id)
 			if err != nil {
 				log.Fatal().Str("uuid", id).Msg("error locating snip uuid")
 			}
@@ -184,7 +186,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 				}
 				basename := path.Base(filename)
 				// title is filename if not supplied
-				err = s.Attach(conn, basename, data)
+				err = s.Attach(basename, data)
 				if err != nil {
 					log.Error().Err(err).Str("filename", filename).Msg("error attaching file")
 					continue
@@ -196,7 +198,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 				log.Fatal().Err(err).Msg("error parsing attach list arguments")
 			}
 
-			list, err := snip.GetAttachmentsAll(conn)
+			list, err := snip.GetAttachmentsAll()
 			if err != nil {
 				log.Fatal().Err(err).Msg("could not list all attachments")
 			}
@@ -204,7 +206,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			// use this function to not load overhead of Data field since it will not be used
 			var attachments []snip.Attachment
 			for _, id := range list {
-				a, err := snip.GetAttachmentMetadata(conn, id)
+				a, err := snip.GetAttachmentMetadata(id)
 				if err != nil {
 					log.Fatal().Err(err).Str("uuid", id.String()).Msg("error getting attachment metadata")
 				}
@@ -242,7 +244,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 					log.Error().Err(err).Str("uuid", "idStr").Msg("error parsing uuid")
 					fmt.Fprintf(os.Stderr, "could not parse attachment %s", idStr)
 				}
-				err = snip.DeleteAttachment(conn, id)
+				err = snip.DeleteAttachment(id)
 				if err != nil {
 					log.Error().Err(err).Str("uuid", idStr).Msg("error removing attachment")
 					fmt.Fprintf(os.Stderr, "could not delete attachment %s", idStr)
@@ -269,14 +271,14 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			if err != nil {
 				log.Fatal().Err(err).Msg("error parsing uuid")
 			}
-			a, err := snip.GetAttachmentFromUUID(conn, id)
+			a, err := snip.GetAttachmentFromUUID(id)
 			// assign outfile name or use saved name if omitted
 			if len(attachWriteCmd.Args()) == 2 {
 				outfile = attachWriteCmd.Args()[1]
 			} else {
 				outfile = a.Title
 			}
-			bytesWritten, err := snip.WriteAttachment(conn, a.UUID, outfile)
+			bytesWritten, err := snip.WriteAttachment(a.UUID, outfile)
 			if err != nil {
 				log.Fatal().Err(err).Msg("error writing attachment to file")
 			}
@@ -294,7 +296,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 		if *getRandom == true {
 			fmt.Fprintf(os.Stderr, "getting random snip\n")
 			// get list
-			allSnips, err := snip.List(conn, 0)
+			allSnips, err := snip.List(0)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error listing all snips: %v", err)
 				log.Fatal().Err(err).Msg("error retrieving all snips")
@@ -320,7 +322,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 		if err != nil {
 			log.Fatal().Err(err).Msg("error converting from bytes to uuid type")
 		}
-		s, err := snip.GetFromUUID(conn, idStr)
+		s, err := snip.GetFromUUID(idStr)
 		if err != nil {
 			log.Fatal().Err(err).Str("uuid", idStr).Msg("error retrieving snip with uuid")
 		}
@@ -346,13 +348,13 @@ snip rm <uuid ...>            remove snip <uuid> ...
 		if err := listCmd.Parse(os.Args[2:]); err != nil {
 			log.Fatal().Err(err).Msg("error parsing ls arguments")
 		}
-		results, err := snip.GetAllMetadata(conn)
+		results, err := snip.GetAllMetadata()
 		if err != nil {
 			log.Fatal().Err(err).Msg("error listing items")
 		}
 		fmt.Printf("results: %d\n", len(results))
 		for _, id := range results {
-			s, err := snip.GetFromUUID(conn, id.String())
+			s, err := snip.GetFromUUID(id.String())
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error getting snip uuid: %s\n", id.String())
 				log.Fatal().Err(err).Str("uuid", s.UUID.String()).Msg("error parsing uuid")
@@ -372,7 +374,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 				log.Debug().Str("uuid", arg).Err(err).Msg("error parsing uuid input")
 				continue
 			}
-			err = snip.Delete(conn, id)
+			err = snip.Delete(id)
 			if err != nil {
 				fmt.Printf("ERROR removing %d/%d %s...", idx+1, len(rmCmd.Args()), arg)
 				log.Debug().Str("uuid", arg).Err(err).Msg("error while attempting to delete snip")
@@ -390,13 +392,13 @@ snip rm <uuid ...>            remove snip <uuid> ...
 		fmt.Printf("searching data field for: %s\n", term)
 		switch *searchField {
 		case "data":
-			results, err = snip.SearchDataTerm(conn, term)
+			results, err = snip.SearchDataTerm(term)
 			if err != nil {
 				log.Fatal().Err(err).Msg("error while searching for term")
 			}
 
 		case "uuid":
-			results, err = snip.SearchUUID(conn, term)
+			results, err = snip.SearchUUID(term)
 			if err != nil {
 				log.Fatal().Err(err).Msg("error while searching for term")
 			}

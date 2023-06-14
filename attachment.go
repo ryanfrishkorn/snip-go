@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/bvinc/go-sqlite-lite/sqlite3"
 	"github.com/google/uuid"
+	"github.com/ryanfrishkorn/snip/database"
 	"strconv"
 	"time"
 )
@@ -19,11 +20,11 @@ type Attachment struct {
 }
 
 // GetAttachmentMetadata returns all fields except Data for analysis without large memory use
-func GetAttachmentMetadata(conn *sqlite3.Conn, searchUUID uuid.UUID) (Attachment, error) {
+func GetAttachmentMetadata(searchUUID uuid.UUID) (Attachment, error) {
 	a := Attachment{}
 
 	var stmt *sqlite3.Stmt
-	stmt, err := conn.Prepare(`SELECT size, snip_uuid, timestamp, title FROM snip_attachment WHERE uuid = ?`, searchUUID.String())
+	stmt, err := database.Conn.Prepare(`SELECT size, snip_uuid, timestamp, title FROM snip_attachment WHERE uuid = ?`, searchUUID.String())
 	if err != nil {
 		return a, err
 	}
@@ -69,11 +70,11 @@ func GetAttachmentMetadata(conn *sqlite3.Conn, searchUUID uuid.UUID) (Attachment
 	return a, nil
 }
 
-func GetAttachmentFromUUID(conn *sqlite3.Conn, searchUUID uuid.UUID) (Attachment, error) {
+func GetAttachmentFromUUID(searchUUID uuid.UUID) (Attachment, error) {
 	a := Attachment{}
 
 	var stmt *sqlite3.Stmt
-	stmt, err := conn.Prepare(`SELECT data, size, snip_uuid, timestamp, title FROM snip_attachment WHERE uuid = ?`, searchUUID.String())
+	stmt, err := database.Conn.Prepare(`SELECT data, size, snip_uuid, timestamp, title FROM snip_attachment WHERE uuid = ?`, searchUUID.String())
 	if err != nil {
 		return a, err
 	}

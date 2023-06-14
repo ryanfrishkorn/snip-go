@@ -5,6 +5,7 @@ import (
 	"github.com/bvinc/go-sqlite-lite/sqlite3"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"github.com/ryanfrishkorn/snip/database"
 	"os"
 	"regexp"
 	"strings"
@@ -21,14 +22,14 @@ type Snip struct {
 }
 
 // Attach adds files associated with a snip
-func (s *Snip) Attach(conn *sqlite3.Conn, title string, data []byte) error {
+func (s *Snip) Attach(title string, data []byte) error {
 	// build and insert attachment
 	a := NewAttachment()
 	a.Data = data
 	a.Title = title
 	a.SnipUUID = s.UUID
 
-	stmt, err := conn.Prepare(`INSERT INTO snip_attachment (uuid, snip_uuid, timestamp, title, data, size) VALUES (?, ?, ?, ?, ?, ?)`)
+	stmt, err := database.Conn.Prepare(`INSERT INTO snip_attachment (uuid, snip_uuid, timestamp, title, data, size) VALUES (?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -57,13 +58,13 @@ func (s *Snip) GenerateTitle(wordCount int) string {
 }
 
 // CreateNewDatabase creates a new sqlite3 database
-func CreateNewDatabase(conn *sqlite3.Conn) error {
+func CreateNewDatabase() error {
 	// build schema
-	err := conn.Exec(`CREATE TABLE IF NOT EXISTS snip(uuid TEXT, timestamp TEXT, title TEXT, data TEXT)`)
+	err := database.Conn.Exec(`CREATE TABLE IF NOT EXISTS snip(uuid TEXT, timestamp TEXT, title TEXT, data TEXT)`)
 	if err != nil {
 		return err
 	}
-	err = conn.Exec(`CREATE TABLE IF NOT EXISTS snip_attachment(uuid TEXT, snip_uuid TEXT, timestamp TEXT, title TEXT, data BLOB, size INTEGER)`)
+	err = database.Conn.Exec(`CREATE TABLE IF NOT EXISTS snip_attachment(uuid TEXT, snip_uuid TEXT, timestamp TEXT, title TEXT, data BLOB, size INTEGER)`)
 	if err != nil {
 		return err
 	}
@@ -72,20 +73,20 @@ func CreateNewDatabase(conn *sqlite3.Conn) error {
 }
 
 // Delete removes a snip from the database
-func Delete(conn *sqlite3.Conn, id uuid.UUID) error {
+func Delete(id uuid.UUID) error {
 	// remove associated attachments
-	attachments, err := GetAttachments(conn, id)
+	attachments, err := GetAttachments(id)
 	if err != nil {
 		return err
 	}
 	for _, a := range attachments {
-		err = DeleteAttachment(conn, a.UUID)
+		err = DeleteAttachment(a.UUID)
 		if err != nil {
 			return err
 		}
 	}
 	// remove
-	stmt, err := conn.Prepare(`DELETE from snip WHERE uuid = ? LIMIT 1`, id.String())
+	stmt, err := database.Conn.Prepare(`DELETE from snip WHERE uuid = ? LIMIT 1`, id.String())
 	if err != nil {
 		return err
 	}
@@ -98,9 +99,9 @@ func Delete(conn *sqlite3.Conn, id uuid.UUID) error {
 }
 
 // DeleteAttachment deletes an attachment from the database
-func DeleteAttachment(conn *sqlite3.Conn, id uuid.UUID) error {
+func DeleteAttachment(id uuid.UUID) error {
 	// remove
-	stmt, err := conn.Prepare(`DELETE from snip_attachment WHERE uuid = ? LIMIT 1`, id.String())
+	stmt, err := database.Conn.Prepare(`DELETE from snip_attachment WHERE uuid = ? LIMIT 1`, id.String())
 	if err != nil {
 		return err
 	}
@@ -112,10 +113,10 @@ func DeleteAttachment(conn *sqlite3.Conn, id uuid.UUID) error {
 	return nil
 }
 
-func GetAllMetadata(conn *sqlite3.Conn) ([]uuid.UUID, error) {
+func GetAllMetadata() ([]uuid.UUID, error) {
 	var snipIDs []uuid.UUID
 
-	stmt, err := conn.Prepare(`SELECT uuid from snip`)
+	stmt, err := database.Conn.Prepare(`SELECT uuid from snip`)
 	if err != nil {
 		return snipIDs, err
 	}
@@ -148,10 +149,10 @@ func GetAllMetadata(conn *sqlite3.Conn) ([]uuid.UUID, error) {
 }
 
 // GetAllAttachments returns a slice of uuids for all attachments in the system
-func GetAttachmentsAll(conn *sqlite3.Conn) ([]uuid.UUID, error) {
+func GetAttachmentsAll() ([]uuid.UUID, error) {
 	var attachmentIDs []uuid.UUID
 
-	stmt, err := conn.Prepare(`SELECT uuid from snip_attachment`)
+	stmt, err := database.Conn.Prepare(`SELECT uuid from snip_attachment`)
 	if err != nil {
 		return attachmentIDs, err
 	}
@@ -184,17 +185,17 @@ func GetAttachmentsAll(conn *sqlite3.Conn) ([]uuid.UUID, error) {
 }
 
 // GetAttachments returns a slice of Attachment associated with the supplied snip uuid
-func GetAttachments(conn *sqlite3.Conn, searchUUID uuid.UUID) ([]Attachment, error) {
+func GetAttachments(searchUUID uuid.UUID) ([]Attachment, error) {
 	var attachments []Attachment
 
-	ids, err := GetAttachmentsUUID(conn, searchUUID)
+	ids, err := GetAttachmentsUUID(searchUUID)
 	if err != nil {
 		return attachments, err
 	}
 	log.Debug()
 
 	for _, id := range ids {
-		a, err := GetAttachmentFromUUID(conn, id)
+		a, err := GetAttachmentFromUUID(id)
 		if err != nil {
 			return attachments, err
 		}
@@ -204,10 +205,10 @@ func GetAttachments(conn *sqlite3.Conn, searchUUID uuid.UUID) ([]Attachment, err
 }
 
 // GetSnipAttachments returns a slice of attachment uuids associated with supplied snip uuid
-func GetAttachmentsUUID(conn *sqlite3.Conn, snipUUID uuid.UUID) ([]uuid.UUID, error) {
+func GetAttachmentsUUID(snipUUID uuid.UUID) ([]uuid.UUID, error) {
 	var results []uuid.UUID
 
-	stmt, err := conn.Prepare(`SELECT uuid FROM snip_attachment WHERE snip_uuid = ?`)
+	stmt, err := database.Conn.Prepare(`SELECT uuid FROM snip_attachment WHERE snip_uuid = ?`)
 	if err != nil {
 		return results, err
 	}
@@ -251,7 +252,7 @@ func FlattenString(input string) string {
 }
 
 // GetFromUUID retrieves a single Snip by its unique identifier
-func GetFromUUID(conn *sqlite3.Conn, searchUUID string) (Snip, error) {
+func GetFromUUID(searchUUID string) (Snip, error) {
 	s := Snip{}
 
 	// determine exact or partial matching
@@ -271,10 +272,10 @@ func GetFromUUID(conn *sqlite3.Conn, searchUUID string) (Snip, error) {
 
 	var stmt *sqlite3.Stmt
 	if exactMatch {
-		stmt, err = conn.Prepare(`SELECT uuid, data, timestamp, title FROM snip WHERE uuid = ?`, searchUUID)
+		stmt, err = database.Conn.Prepare(`SELECT uuid, data, timestamp, title FROM snip WHERE uuid = ?`, searchUUID)
 	} else {
 		searchUUIDFuzzy := "%" + searchUUID + "%"
-		stmt, err = conn.Prepare(`SELECT uuid, data, timestamp, title FROM snip WHERE uuid LIKE ?`, searchUUIDFuzzy)
+		stmt, err = database.Conn.Prepare(`SELECT uuid, data, timestamp, title FROM snip WHERE uuid LIKE ?`, searchUUIDFuzzy)
 	}
 	if err != nil {
 		return s, err
@@ -321,7 +322,7 @@ func GetFromUUID(conn *sqlite3.Conn, searchUUID string) (Snip, error) {
 	}
 
 	// gather attachments
-	s.Attachments, err = GetAttachments(conn, s.UUID)
+	s.Attachments, err = GetAttachments(s.UUID)
 	if err != nil {
 		return s, err
 	}
@@ -330,13 +331,13 @@ func GetFromUUID(conn *sqlite3.Conn, searchUUID string) (Snip, error) {
 }
 
 // InsertSnip adds a new Snip to the database
-func InsertSnip(conn *sqlite3.Conn, s Snip) error {
+func InsertSnip(s Snip) error {
 	// do not insert without data
 	if len(s.Data) == 0 {
 		return fmt.Errorf("refusing to insert zero-length data")
 	}
 
-	stmt, err := conn.Prepare(`INSERT INTO snip VALUES (?, ?, ?, ?)`)
+	stmt, err := database.Conn.Prepare(`INSERT INTO snip VALUES (?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -351,18 +352,18 @@ func InsertSnip(conn *sqlite3.Conn, s Snip) error {
 }
 
 // List returns a slice of all Snips in the database
-func List(conn *sqlite3.Conn, limit int) ([]Snip, error) {
+func List(limit int) ([]Snip, error) {
 	var results []Snip
 	var stmt *sqlite3.Stmt
 	var err error
 
 	if limit != 0 {
-		stmt, err = conn.Prepare(`SELECT uuid, timestamp, title, data from snip LIMIT ?`, limit)
+		stmt, err = database.Conn.Prepare(`SELECT uuid, timestamp, title, data from snip LIMIT ?`, limit)
 		if err != nil {
 			return results, err
 		}
 	} else {
-		stmt, err = conn.Prepare(`SELECT uuid, timestamp, title, data from snip`)
+		stmt, err = database.Conn.Prepare(`SELECT uuid, timestamp, title, data from snip`)
 		if err != nil {
 			return results, err
 		}
@@ -414,7 +415,7 @@ func New() (Snip, error) {
 }
 
 // SearchDataTerm returns a slice of Snips whose data matches supplied terms
-func SearchDataTerm(conn *sqlite3.Conn, term string) ([]Snip, error) {
+func SearchDataTerm(term string) ([]Snip, error) {
 	var searchResult []Snip
 	if term == "" {
 		return searchResult, fmt.Errorf("refusing to search for empty string")
@@ -422,7 +423,7 @@ func SearchDataTerm(conn *sqlite3.Conn, term string) ([]Snip, error) {
 
 	// make term search fuzzy
 	termFuzzy := "%" + term + "%"
-	stmt, err := conn.Prepare(`SELECT uuid from snip where data LIKE ?`, termFuzzy)
+	stmt, err := database.Conn.Prepare(`SELECT uuid from snip where data LIKE ?`, termFuzzy)
 	if err != nil {
 		return searchResult, err
 	}
@@ -441,7 +442,7 @@ func SearchDataTerm(conn *sqlite3.Conn, term string) ([]Snip, error) {
 			break
 		}
 
-		s, err := GetFromUUID(conn, idStr)
+		s, err := GetFromUUID(idStr)
 		if err != nil {
 			return searchResult, err
 		}
@@ -452,14 +453,14 @@ func SearchDataTerm(conn *sqlite3.Conn, term string) ([]Snip, error) {
 }
 
 // SearchUUID returns a slice of Snips with uuids matching partial search term
-func SearchUUID(conn *sqlite3.Conn, term string) ([]Snip, error) {
+func SearchUUID(term string) ([]Snip, error) {
 	var searchResult []Snip
 	if term == "" {
 		return searchResult, fmt.Errorf("refusing to search for empty string")
 	}
 
 	termFuzzy := "%" + term + "%"
-	stmt, err := conn.Prepare(`SELECT uuid from snip where uuid LIKE ?`, termFuzzy)
+	stmt, err := database.Conn.Prepare(`SELECT uuid from snip where uuid LIKE ?`, termFuzzy)
 	if err != nil {
 		return searchResult, err
 	}
@@ -480,7 +481,7 @@ func SearchUUID(conn *sqlite3.Conn, term string) ([]Snip, error) {
 			// TODO scrutinize this
 			break
 		}
-		s, err := GetFromUUID(conn, idStr)
+		s, err := GetFromUUID(idStr)
 		if err != nil {
 			return searchResult, err
 		}
@@ -490,8 +491,8 @@ func SearchUUID(conn *sqlite3.Conn, term string) ([]Snip, error) {
 }
 
 // WriteAttachment writes the attached file to the current working directory
-func WriteAttachment(conn *sqlite3.Conn, id uuid.UUID, outfile string) (int, error) {
-	a, err := GetAttachmentFromUUID(conn, id)
+func WriteAttachment(id uuid.UUID, outfile string) (int, error) {
+	a, err := GetAttachmentFromUUID(id)
 	if err != nil {
 		log.Debug().Err(err).Str("uuid", id.String()).Msg("error obtaining attachment from id")
 		return 0, err
