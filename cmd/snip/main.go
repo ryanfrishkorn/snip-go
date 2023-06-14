@@ -34,26 +34,29 @@ func main() {
 	}
 	dbFilePath := homePath + "/" + dbFilename
 
-	helpOutput := func() {
-		fmt.Printf("usage:\n")
-		fmt.Printf("snip add                      add a new snip from standard input\n")
-		fmt.Printf("       -f <file>              data from file instead of stdin default\n")
-		fmt.Printf("       -t <title>             use specified title\n")
-		fmt.Println()
-		fmt.Printf("snip attach                   attach a file to specified snip\n")
-		fmt.Printf("       add <uuid> <file ...>  add attachment files to snip\n")
-		fmt.Printf("       list                   list all attachments in database\n")
-		fmt.Printf("         -sort <size|title>   sort by snip field (default: title)\n")
-		fmt.Println()
-		fmt.Printf("snip get <uuid>               retrieve snip with specified uuid\n")
-		fmt.Printf("       -raw                   output only raw data from snip\n")
-		fmt.Println()
-		fmt.Printf("snip ls                       list all snips\n")
-		fmt.Println()
-		fmt.Printf("snip search <term>            return snips whose data contains given term\n")
-		fmt.Printf("       -f <field>             search snip field\n")
-		fmt.Println()
-		fmt.Printf("snip rm <uuid ...>            remove snip <uuid> ...\n")
+	helpMessage :=
+		`usage:
+snip add                      add a new snip from standard input
+       -f <file>              data from file instead of stdin default
+       -t <title>             use specified title
+
+snip attach                   attach a file to specified snip
+       add <uuid> <file ...>  add attachment files to snip
+       list                   list all attachments in database
+         -sort <size|title>   sort by snip field (default: title)
+
+snip get <uuid>               retrieve snip with specified uuid
+       -raw                   output only raw data from snip
+
+snip ls                       list all snips
+
+snip search <term>            return snips whose data contains given term
+       -f <field>             search snip field
+
+snip rm <uuid ...>            remove snip <uuid> ...
+`
+	Usage := func() {
+		fmt.Fprintf(os.Stderr, "%s", helpMessage)
 		os.Exit(1)
 	}
 
@@ -82,7 +85,7 @@ func main() {
 
 	// establish action
 	if len(os.Args) < 2 {
-		helpOutput()
+		Usage()
 	}
 	action := os.Args[1]
 
@@ -405,7 +408,7 @@ func main() {
 		}
 
 	default:
-		helpOutput()
+		Usage()
 	}
 
 	log.Debug().Msg("program execution complete")
