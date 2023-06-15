@@ -39,12 +39,12 @@ func main() {
 		`usage:
 snip add                      add a new snip from standard input
        -f <file>              data from file instead of stdin default
-       -t <title>             use specified title
+       -t <name>              use specified name
 
 snip attach                   attach a file to specified snip
        add <uuid> <file ...>  add attachment files to snip
        list                   list all attachments in database
-         -sort <size|title>   sort by snip field (default: title)
+         -sort <size|name>    sort by snip field (default: name)
 
 snip get <uuid>               retrieve snip with specified uuid
        -raw                   output only raw data from snip
@@ -63,12 +63,12 @@ snip rm <uuid ...>            remove snip <uuid> ...
 
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	addDataFromFile := addCmd.String("f", "", "use data from specified file")
-	addTitle := addCmd.String("t", "", "specify title")
+	addName := addCmd.String("t", "", "specify name")
 
 	attachCmd := flag.NewFlagSet("attach", flag.ExitOnError)
 	attachAddCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	attachListCmd := flag.NewFlagSet("ls", flag.ExitOnError)
-	attachListSort := attachListCmd.String("sort", "title", "field to sort attachment list by")
+	attachListSort := attachListCmd.String("sort", "name", "field to sort attachment list by")
 	attachRemoveCmd := flag.NewFlagSet("rm", flag.ExitOnError)
 	attachWriteCmd := flag.NewFlagSet("write", flag.ExitOnError)
 
@@ -131,16 +131,16 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			}
 			s.Data = data
 		}
-		s.Title = *addTitle
-		// generate title if empty
-		if s.Title == "" {
-			s.Title = s.GenerateTitle(5)
+		s.Name = *addName
+		// generate name if empty
+		if s.Name == "" {
+			s.Name = s.GenerateName(5)
 		}
 
 		log.Debug().
 			Str("UUID", s.UUID.String()).
 			Str("timestamp", s.Timestamp.String()).
-			Str("title", s.Title).
+			Str("name", s.Name).
 			Bytes("Data", s.Data).
 			Msg("first snip object")
 		err = snip.InsertSnip(s)
@@ -185,7 +185,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 					log.Fatal().Err(err).Msg("error reading attachment file data")
 				}
 				basename := path.Base(filename)
-				// title is filename if not supplied
+				// name is filename if not supplied
 				err = s.Attach(basename, data)
 				if err != nil {
 					log.Error().Err(err).Str("filename", filename).Msg("error attaching file")
@@ -219,18 +219,20 @@ snip rm <uuid ...>            remove snip <uuid> ...
 					// this is deliberate reversal to sort the largest items first
 					return attachments[i].Size > attachments[j].Size
 				})
+			case "name":
+				fallthrough
 			default:
 				fmt.Println("*attachListSort: ", *attachListSort)
 				sort.Slice(attachments, func(i, j int) bool {
 					// this is deliberate reversal to sort the largest items first
-					return attachments[i].Title < attachments[j].Title
+					return attachments[i].Name < attachments[j].Name
 				})
 			}
 
 			// print analysis
-			fmt.Printf("%s %s %42s %s\n", "count", "uuid", "size", "title")
+			fmt.Printf("%s %s %42s %s\n", "count", "uuid", "size", "name")
 			for idx, a := range attachments {
-				fmt.Printf("%5d %s %10d %s\n", idx+1, a.UUID, a.Size, truncateStr(a.Title, 60))
+				fmt.Printf("%5d %s %10d %s\n", idx+1, a.UUID, a.Size, truncateStr(a.Name, 60))
 			}
 
 		// REMOVE attachments by uuid
@@ -276,13 +278,13 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			if len(attachWriteCmd.Args()) == 2 {
 				outfile = attachWriteCmd.Args()[1]
 			} else {
-				outfile = a.Title
+				outfile = a.Name
 			}
 			bytesWritten, err := snip.WriteAttachment(a.UUID, outfile)
 			if err != nil {
 				log.Fatal().Err(err).Msg("error writing attachment to file")
 			}
-			fmt.Printf("%s written to %s %d bytes\n", a.Title, outfile, bytesWritten)
+			fmt.Printf("%s written to %s %d bytes\n", a.Name, outfile, bytesWritten)
 
 		}
 
@@ -331,7 +333,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			fmt.Printf("%s", s.Data)
 		} else {
 			fmt.Printf("uuid: %s\n", s.UUID.String())
-			fmt.Printf("title: %s\n", s.Title)
+			fmt.Printf("name: %s\n", s.Name)
 			fmt.Printf("timestamp: %s\n", s.Timestamp.Format(time.RFC3339Nano))
 			fmt.Printf("data: \n")
 			fmt.Printf("----\n")
@@ -340,7 +342,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			// print attachments if present
 			fmt.Printf("attachments:\n")
 			for idx, a := range s.Attachments {
-				fmt.Printf("  %d - %s %s %d bytes\n", idx, a.UUID.String(), a.Title, a.Size)
+				fmt.Printf("  %d - %s %s %d bytes\n", idx, a.UUID.String(), a.Name, a.Size)
 			}
 		}
 
@@ -359,7 +361,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 				fmt.Fprintf(os.Stderr, "error getting snip uuid: %s\n", id.String())
 				log.Fatal().Err(err).Str("uuid", s.UUID.String()).Msg("error parsing uuid")
 			}
-			fmt.Printf("%s %s\n", s.UUID, s.Title)
+			fmt.Printf("%s %s\n", s.UUID, s.Name)
 		}
 
 	case "rm":
@@ -406,7 +408,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 
 		fmt.Printf("results: %d\n\n", len(results))
 		for _, s := range results {
-			fmt.Printf("uuid: %s title: %s\n", s.UUID.String(), s.Title)
+			fmt.Printf("uuid: %s name: %s\n", s.UUID.String(), s.Name)
 		}
 
 	default:

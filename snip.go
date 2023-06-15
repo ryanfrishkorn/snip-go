@@ -17,25 +17,25 @@ type Snip struct {
 	Attachments []Attachment
 	Data        []byte
 	Timestamp   time.Time
-	Title       string
+	Name        string
 	UUID        uuid.UUID
 }
 
 // Attach adds files associated with a snip
-func (s *Snip) Attach(title string, data []byte) error {
+func (s *Snip) Attach(name string, data []byte) error {
 	// build and insert attachment
 	a := NewAttachment()
 	a.Data = data
-	a.Title = title
+	a.Name = name
 	a.SnipUUID = s.UUID
 
-	stmt, err := database.Conn.Prepare(`INSERT INTO snip_attachment (uuid, snip_uuid, timestamp, title, data, size) VALUES (?, ?, ?, ?, ?, ?)`)
+	stmt, err := database.Conn.Prepare(`INSERT INTO snip_attachment (uuid, snip_uuid, timestamp, name, data, size) VALUES (?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
-	err = stmt.Exec(a.UUID.String(), a.SnipUUID.String(), a.Timestamp.String(), a.Title, a.Data, len(a.Data))
+	err = stmt.Exec(a.UUID.String(), a.SnipUUID.String(), a.Timestamp.String(), a.Name, a.Data, len(a.Data))
 	if err != nil {
 		return err
 	}
@@ -48,23 +48,23 @@ func (s *Snip) CountWords() int {
 	return len(strings.Split(data, " "))
 }
 
-// GenerateTitle returns a clean string derived from processing the data field
-func (s *Snip) GenerateTitle(wordCount int) string {
+// GenerateName returns a clean string derived from processing the data field
+func (s *Snip) GenerateName(wordCount int) string {
 	data := FlattenString(string(s.Data))
 	// FIXME by allowing additional sensible characters such as `:`
 	pattern := regexp.MustCompile(`\w+`)
-	title := pattern.FindAllString(data, wordCount)
-	return strings.Join(title, " ")
+	name := pattern.FindAllString(data, wordCount)
+	return strings.Join(name, " ")
 }
 
 // CreateNewDatabase creates a new sqlite3 database
 func CreateNewDatabase() error {
 	// build schema
-	err := database.Conn.Exec(`CREATE TABLE IF NOT EXISTS snip(uuid TEXT, timestamp TEXT, title TEXT, data TEXT)`)
+	err := database.Conn.Exec(`CREATE TABLE IF NOT EXISTS snip(uuid TEXT, timestamp TEXT, name TEXT, data TEXT)`)
 	if err != nil {
 		return err
 	}
-	err = database.Conn.Exec(`CREATE TABLE IF NOT EXISTS snip_attachment(uuid TEXT, snip_uuid TEXT, timestamp TEXT, title TEXT, data BLOB, size INTEGER)`)
+	err = database.Conn.Exec(`CREATE TABLE IF NOT EXISTS snip_attachment(uuid TEXT, snip_uuid TEXT, timestamp TEXT, name TEXT, data BLOB, size INTEGER)`)
 	if err != nil {
 		return err
 	}
@@ -272,10 +272,10 @@ func GetFromUUID(searchUUID string) (Snip, error) {
 
 	var stmt *sqlite3.Stmt
 	if exactMatch {
-		stmt, err = database.Conn.Prepare(`SELECT uuid, data, timestamp, title FROM snip WHERE uuid = ?`, searchUUID)
+		stmt, err = database.Conn.Prepare(`SELECT uuid, data, timestamp, name FROM snip WHERE uuid = ?`, searchUUID)
 	} else {
 		searchUUIDFuzzy := "%" + searchUUID + "%"
-		stmt, err = database.Conn.Prepare(`SELECT uuid, data, timestamp, title FROM snip WHERE uuid LIKE ?`, searchUUIDFuzzy)
+		stmt, err = database.Conn.Prepare(`SELECT uuid, data, timestamp, name FROM snip WHERE uuid LIKE ?`, searchUUIDFuzzy)
 	}
 	if err != nil {
 		return s, err
@@ -301,8 +301,8 @@ func GetFromUUID(searchUUID string) (Snip, error) {
 		var data string
 		var id string
 		var timestamp string
-		var title string
-		err = stmt.Scan(&id, &data, &timestamp, &title)
+		var name string
+		err = stmt.Scan(&id, &data, &timestamp, &name)
 		if err != nil {
 			return s, err
 		}
@@ -312,7 +312,7 @@ func GetFromUUID(searchUUID string) (Snip, error) {
 			return s, fmt.Errorf("error parsing uuid string into struct")
 		}
 		s.Timestamp, err = time.Parse(time.RFC3339Nano, timestamp)
-		s.Title = title
+		s.Name = name
 		if err != nil {
 			return s, err
 		}
@@ -344,7 +344,7 @@ func InsertSnip(s Snip) error {
 	defer stmt.Close()
 
 	// reference
-	err = stmt.Exec(s.UUID.String(), s.Timestamp.Format(time.RFC3339Nano), s.Title, string(s.Data))
+	err = stmt.Exec(s.UUID.String(), s.Timestamp.Format(time.RFC3339Nano), s.Name, string(s.Data))
 	if err != nil {
 		return err
 	}
@@ -358,12 +358,12 @@ func List(limit int) ([]Snip, error) {
 	var err error
 
 	if limit != 0 {
-		stmt, err = database.Conn.Prepare(`SELECT uuid, timestamp, title, data from snip LIMIT ?`, limit)
+		stmt, err = database.Conn.Prepare(`SELECT uuid, timestamp, name, data from snip LIMIT ?`, limit)
 		if err != nil {
 			return results, err
 		}
 	} else {
-		stmt, err = database.Conn.Prepare(`SELECT uuid, timestamp, title, data from snip`)
+		stmt, err = database.Conn.Prepare(`SELECT uuid, timestamp, name, data from snip`)
 		if err != nil {
 			return results, err
 		}
@@ -378,10 +378,10 @@ func List(limit int) ([]Snip, error) {
 
 		var idStr string
 		var timestampStr string
-		var title string
+		var name string
 		var data []byte
 
-		err = stmt.Scan(&idStr, &timestampStr, &title, &data)
+		err = stmt.Scan(&idStr, &timestampStr, &name, &data)
 		if err != nil {
 			break
 		}
@@ -396,7 +396,7 @@ func List(limit int) ([]Snip, error) {
 		s := Snip{
 			UUID:      id,
 			Timestamp: timestamp,
-			Title:     title,
+			Name:      name,
 			Data:      data,
 		}
 		results = append(results, s)
@@ -409,7 +409,7 @@ func New() (Snip, error) {
 	return Snip{
 		Data:      []byte{},
 		Timestamp: time.Now(),
-		Title:     "",
+		Name:      "",
 		UUID:      uuid.New(),
 	}, nil
 }
@@ -501,7 +501,7 @@ func WriteAttachment(id uuid.UUID, outfile string) (int, error) {
 	// never overwrite data
 	_, err = os.Stat(outfile)
 	if err == nil {
-		log.Debug().Str("filename", a.Title).Msg("stat returned no errors, refusing to overwrite file")
+		log.Debug().Str("filename", a.Name).Msg("stat returned no errors, refusing to overwrite file")
 		return 0, fmt.Errorf("refusing to overwrite file")
 	}
 	f, err := os.Create(outfile)
@@ -511,7 +511,7 @@ func WriteAttachment(id uuid.UUID, outfile string) (int, error) {
 	}
 	bytesWritten, err := f.Write(a.Data)
 	if err != nil {
-		log.Debug().Err(err).Str("filename", a.Title).Msg("error attempting to write data to file")
+		log.Debug().Err(err).Str("filename", a.Name).Msg("error attempting to write data to file")
 		return 0, err
 	}
 	return bytesWritten, err

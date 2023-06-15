@@ -107,7 +107,7 @@ func TestSnip_CountWords(t *testing.T) {
 	}
 }
 
-func TestSnip_GenerateTitle(t *testing.T) {
+func TestSnip_GenerateName(t *testing.T) {
 	s, err := New()
 	if err != nil {
 		t.Errorf("error generating new snip: %v", err)
@@ -115,7 +115,7 @@ func TestSnip_GenerateTitle(t *testing.T) {
 	s.Data = []byte("My day   at\n the\taquarium started out")
 
 	expected := "My day at the aquarium"
-	modified := s.GenerateTitle(5)
+	modified := s.GenerateName(5)
 	if strings.Compare(expected, modified) != 0 {
 		t.Errorf(`expected string "%s", got "%s"`, expected, modified)
 	}

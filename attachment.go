@@ -16,7 +16,7 @@ type Attachment struct {
 	Size      int
 	SnipUUID  uuid.UUID
 	Timestamp time.Time
-	Title     string
+	Name      string
 }
 
 // GetAttachmentMetadata returns all fields except Data for analysis without large memory use
@@ -24,7 +24,7 @@ func GetAttachmentMetadata(searchUUID uuid.UUID) (Attachment, error) {
 	a := Attachment{}
 
 	var stmt *sqlite3.Stmt
-	stmt, err := database.Conn.Prepare(`SELECT size, snip_uuid, timestamp, title FROM snip_attachment WHERE uuid = ?`, searchUUID.String())
+	stmt, err := database.Conn.Prepare(`SELECT size, snip_uuid, timestamp, name FROM snip_attachment WHERE uuid = ?`, searchUUID.String())
 	if err != nil {
 		return a, err
 	}
@@ -51,9 +51,9 @@ func GetAttachmentMetadata(searchUUID uuid.UUID) (Attachment, error) {
 			size      string
 			snipUUID  string
 			timestamp string
-			title     string
+			name      string
 		)
-		err = stmt.Scan(&size, &snipUUID, &timestamp, &title)
+		err = stmt.Scan(&size, &snipUUID, &timestamp, &name)
 		if err != nil {
 			return a, err
 		}
@@ -63,7 +63,7 @@ func GetAttachmentMetadata(searchUUID uuid.UUID) (Attachment, error) {
 		}
 		a.Size, err = strconv.Atoi(size)
 		a.Timestamp, err = time.Parse(time.RFC3339Nano, timestamp)
-		a.Title = title
+		a.Name = name
 	}
 	if resultCount == 0 {
 		return a, fmt.Errorf("database search returned zero results")
@@ -75,7 +75,7 @@ func GetAttachmentFromUUID(searchUUID uuid.UUID) (Attachment, error) {
 	a := Attachment{}
 
 	var stmt *sqlite3.Stmt
-	stmt, err := database.Conn.Prepare(`SELECT data, size, snip_uuid, timestamp, title FROM snip_attachment WHERE uuid = ?`, searchUUID.String())
+	stmt, err := database.Conn.Prepare(`SELECT data, size, snip_uuid, timestamp, name FROM snip_attachment WHERE uuid = ?`, searchUUID.String())
 	if err != nil {
 		return a, err
 	}
@@ -102,9 +102,9 @@ func GetAttachmentFromUUID(searchUUID uuid.UUID) (Attachment, error) {
 			size      string
 			snipUUID  string
 			timestamp string
-			title     string
+			name      string
 		)
-		err = stmt.Scan(&data, &size, &snipUUID, &timestamp, &title)
+		err = stmt.Scan(&data, &size, &snipUUID, &timestamp, &name)
 		if err != nil {
 			return a, err
 		}
@@ -115,7 +115,7 @@ func GetAttachmentFromUUID(searchUUID uuid.UUID) (Attachment, error) {
 		a.Data = []byte(data)
 		a.Size, err = strconv.Atoi(size)
 		a.Timestamp, err = time.Parse(time.RFC3339Nano, timestamp)
-		a.Title = title
+		a.Name = name
 	}
 	if resultCount == 0 {
 		return a, fmt.Errorf("database search returned zero results")
@@ -129,7 +129,7 @@ func NewAttachment() Attachment {
 		Data:      []byte{},
 		Size:      0,
 		Timestamp: time.Now(),
-		Title:     "",
+		Name:      "",
 		UUID:      uuid.New(),
 	}
 }
