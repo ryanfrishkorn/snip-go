@@ -162,12 +162,11 @@ snip rm <uuid ...>            remove snip <uuid> ...
 				log.Fatal().Err(err).Msg("error parsing attach list arguments")
 			}
 
-			// should always have two arguments, uuid and at least one file
-			if len(attachAddCmd.Args()) != 2 {
+			// should always have at least two arguments, uuid and at least one file
+			if len(attachAddCmd.Args()) < 2 {
 				log.Debug().Int("length", len(attachAddCmd.Args())).Msg("argument length")
 				log.Debug().Str("args", strings.Join(attachAddCmd.Args(), " ")).Msg("arguments")
-				attachAddCmd.Usage()
-				os.Exit(1)
+				Usage()
 			}
 			// INSERT new attachments
 			id := attachAddCmd.Args()[0]
@@ -285,7 +284,8 @@ snip rm <uuid ...>            remove snip <uuid> ...
 				log.Fatal().Err(err).Msg("error writing attachment to file")
 			}
 			fmt.Printf("%s written to %s %d bytes\n", a.Name, outfile, bytesWritten)
-
+		default:
+			Usage()
 		}
 
 	case "get":
