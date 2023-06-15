@@ -78,6 +78,8 @@ snip rm <uuid ...>            remove snip <uuid> ...
 
 	listCmd := flag.NewFlagSet("ls", flag.ExitOnError)
 
+	renameCmd := flag.NewFlagSet("rename", flag.ExitOnError)
+
 	searchCmd := flag.NewFlagSet("search", flag.ExitOnError)
 	// fuzzy data search by default unless field is specified
 	searchField := searchCmd.String("f", "data", "field to search")
@@ -354,15 +356,44 @@ snip rm <uuid ...>            remove snip <uuid> ...
 		if err != nil {
 			log.Fatal().Err(err).Msg("error listing items")
 		}
-		fmt.Printf("results: %d\n", len(results))
-		for _, id := range results {
+		for idx, id := range results {
 			s, err := snip.GetFromUUID(id.String())
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error getting snip uuid: %s\n", id.String())
 				log.Fatal().Err(err).Str("uuid", s.UUID.String()).Msg("error parsing uuid")
 			}
-			fmt.Printf("%s %s\n", s.UUID, s.Name)
+			fmt.Printf("%d %s %s\n", idx+1, s.UUID, s.Name)
 		}
+
+	case "rename":
+		if err := renameCmd.Parse(os.Args[2:]); err != nil {
+			log.Fatal().Err(err).Msg("error parsing rename arguments")
+		}
+		// require one argument
+		if len(renameCmd.Args()) != 2 {
+			fmt.Fprintf(os.Stderr, "rename action requires two arguments\n")
+			log.Fatal().Err(err).Msg("error parsing rename arguments")
+		}
+
+		idStr := renameCmd.Args()[0]
+		newName := renameCmd.Args()[1]
+		// no empty strings allowed
+		if newName == "" {
+			fmt.Fprintf(os.Stderr, "new name must not be an empty string\n")
+			log.Fatal().Err(err).Msg("no empty string allowed for renaming")
+		}
+		s, err := snip.GetFromUUID(idStr)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not retrieve snip with id: %s\n", idStr)
+		}
+		oldName := s.Name
+		s.Name = newName
+		err = s.Update()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error updating snip %s %v", idStr, err)
+			log.Fatal().Err(err).Msg("could not update snip")
+		}
+		fmt.Printf("renamed %s %s -> %s\n", s.UUID.String(), oldName, newName)
 
 	case "rm":
 		if err := rmCmd.Parse(os.Args[2:]); err != nil {
@@ -391,7 +422,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 
 		var results []snip.Snip
 		term := searchCmd.Args()[0]
-		fmt.Printf("searching data field for: %s\n", term)
+		fmt.Fprintf(os.Stderr, "searching data field for: \"%s\"\n", term)
 		switch *searchField {
 		case "data":
 			results, err = snip.SearchDataTerm(term)
@@ -406,9 +437,9 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			}
 		}
 
-		fmt.Printf("results: %d\n\n", len(results))
-		for _, s := range results {
-			fmt.Printf("uuid: %s name: %s\n", s.UUID.String(), s.Name)
+		// fmt.Printf("results: %d\n\n", len(results))
+		for idx, s := range results {
+			fmt.Printf("%d uuid: %s name: %s\n", idx+1, s.UUID.String(), s.Name)
 		}
 
 	default:

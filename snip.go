@@ -57,6 +57,59 @@ func (s *Snip) GenerateName(wordCount int) string {
 	return strings.Join(name, " ")
 }
 
+// Rename updates the name field of a snip
+func (s *Snip) Rename(newName string) error {
+	s.Name = newName
+	err := s.Update()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Update writes all fields, overwriting existing snip data
+func (s *Snip) Update() error {
+	// verify that current record is present and unique
+	stmt, err := database.Conn.Prepare(`SELECT count() FROM snip where uuid = ?`, s.UUID.String())
+	if err != nil {
+		return err
+	}
+	// update
+	err = stmt.Exec()
+	if err != nil {
+		return err
+	}
+	count := 0
+	for {
+		hasRow, err := stmt.Step()
+		if err != nil {
+			return err
+		}
+		if !hasRow {
+			break
+		}
+		count++
+	}
+
+	if count != 1 {
+		return fmt.Errorf("should have returned 1 snip record, found %d", count)
+	}
+	stmt.Close()
+
+	// FIXME handle attachments
+	// update the record
+	stmt, err = database.Conn.Prepare(`UPDATE snip SET (data, timestamp, name) = (?, ?, ?) WHERE uuid = ?`)
+	if err != nil {
+		return err
+	}
+	err = stmt.Exec(string(s.Data), s.Timestamp.Format(time.RFC3339Nano), s.Name, s.UUID.String())
+	if err != nil {
+		return err
+	}
+	stmt.Close()
+	return nil
+}
+
 // CreateNewDatabase creates a new sqlite3 database
 func CreateNewDatabase() error {
 	// build schema
@@ -289,6 +342,9 @@ func GetFromUUID(searchUUID string) (Snip, error) {
 	resultCount := 0
 	for {
 		hasRow, err := stmt.Step()
+		if err != nil {
+			return s, err
+		}
 		if !hasRow {
 			break
 		}
