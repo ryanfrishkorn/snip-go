@@ -282,7 +282,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 
 		// REMOVE attachments by uuid
 		case "rm":
-			if err := attachRemoveCmd.Parse(attachCmd.Args()); err != nil {
+			if err := attachRemoveCmd.Parse(attachCmd.Args()[1:]); err != nil {
 				fmt.Fprintf(os.Stderr, "The arguments to the rm command could not be parsed.\n")
 				log.Debug().Err(err).Msg("error parsing attach remove arguments")
 				attachRemoveCmd.Usage()
@@ -293,12 +293,12 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				id, err := uuid.Parse(idStr)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "The supplied id %s could not be validated and may be malformed.\n", idStr)
-					log.Error().Err(err).Str("uuid", "idStr").Msg("error parsing uuid")
+					log.Debug().Err(err).Str("uuid", "idStr").Msg("error parsing uuid")
 				}
 				err = snip.DeleteAttachment(id)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "There was a problem while trying to delete attachment %s", idStr)
-					log.Error().Err(err).Str("uuid", idStr).Msg("error removing attachment")
+					log.Debug().Err(err).Str("uuid", idStr).Msg("error removing attachment")
 				} else {
 					fmt.Printf("removed attachment %s\n", id)
 				}
