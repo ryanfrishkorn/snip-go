@@ -27,15 +27,18 @@ func main() {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
-	// preliminaries
-	homePath := os.Getenv("HOME")
-	dbFilename := ".snip.sqlite3"
-	if homePath == "" {
-		fmt.Fprintf(os.Stderr, "please $HOME env to your home directory for database save location")
-		log.Debug().Msg("could not retrieve $HOME environment variable")
-		os.Exit(1)
+	// check env for explicit database path
+	dbFilePath := os.Getenv("SNIP_DB")
+	if dbFilePath == "" {
+		homePath := os.Getenv("HOME")
+		dbFilename := ".snip.sqlite3"
+		if homePath == "" {
+			fmt.Fprintf(os.Stderr, "please $HOME env to your home directory for database save location")
+			log.Debug().Msg("could not retrieve $HOME environment variable")
+			os.Exit(1)
+		}
+		dbFilePath = homePath + "/" + dbFilename
 	}
-	dbFilePath := homePath + "/" + dbFilename
 
 	helpMessage :=
 		`usage:
@@ -71,6 +74,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	addCmdFile := addCmd.String("f", "", "use data from specified file")
 	addCmdName := addCmd.String("n", "", "specify name")
+	addCmdUUID := addCmd.String("u", "", "specify uuid")
 
 	attachCmd := flag.NewFlagSet("attach", flag.ExitOnError)
 	attachCmdGet := flag.NewFlagSet("get", flag.ExitOnError)
@@ -161,6 +165,17 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			s.Name = s.GenerateName(5)
 		}
 
+		// modify uuid if it was specified as an argument
+		if *addCmdUUID != "" {
+			id, err := uuid.Parse(*addCmdUUID)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "There was a problem parsing the supplied uuid %s which may be malformed.\n", *addCmdUUID)
+				log.Debug().Err(err).Msg("error parsing uuid from arguments")
+				os.Exit(1)
+			}
+			s.UUID = id
+		}
+
 		log.Debug().
 			Str("UUID", s.UUID.String()).
 			Str("timestamp", s.Timestamp.String()).
@@ -186,11 +201,9 @@ snip rm <uuid ...>              remove snip <uuid> ...
 		// LIST attachments with additional info
 		switch attachCmd.Args()[0] {
 		case "add":
-			// attachCmdAdd
 			if err := attachCmdAdd.Parse(attachCmd.Args()[1:]); err != nil {
 				log.Debug().Err(err).Msg("error parsing attach list arguments")
 				attachCmdAdd.Usage()
-				// fmt.Fprintf(os.Stderr, "MARKER MARKER MARKER")
 				os.Exit(1)
 			}
 
