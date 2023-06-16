@@ -41,12 +41,16 @@ func main() {
 		`usage:
 snip add                      add a new snip from standard input
        -f <file>              data from file instead of stdin default
-       -t <name>              use specified name
+       -n <name>              use specified name
 
 snip attach                   attach a file to specified snip
        add <uuid> <file ...>  add attachment files to snip
+       get <uuid>             display attachment metadata and info
        list                   list all attachments in database
-         -sort <size|name>    sort by snip field (default: name)
+         -sort <size|name>    sort by attachment field (default: name)
+       rm <uuid ...>          remove attachment
+	   stdout <uuid>          write data to stdout
+       write <file>           write data to file
 
 snip get <uuid>               retrieve snip with specified uuid
        -raw                   output only raw data from snip
@@ -64,9 +68,10 @@ snip rm <uuid ...>            remove snip <uuid> ...
 
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	addDataFromFile := addCmd.String("f", "", "use data from specified file")
-	addName := addCmd.String("t", "", "specify name")
+	addName := addCmd.String("n", "", "specify name")
 
 	attachCmd := flag.NewFlagSet("attach", flag.ExitOnError)
+	attachGetCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	attachAddCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	attachListCmd := flag.NewFlagSet("ls", flag.ExitOnError)
 	attachListSort := attachListCmd.String("sort", "name", "field to sort attachment list by")
@@ -176,10 +181,6 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			attachCmd.Usage()
 			os.Exit(1)
 		}
-		if len(attachCmd.Args()) < 2 {
-			Usage()
-			os.Exit(1)
-		}
 
 		// LIST attachments with additional info
 		switch attachCmd.Args()[0] {
@@ -229,6 +230,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 				}
 				fmt.Printf("attached %s %d bytes\n", filename, len(data))
 			}
+
 		case "ls":
 			if err := attachListCmd.Parse(attachCmd.Args()[1:]); err != nil {
 				fmt.Fprintf(os.Stderr, "The ls arguments could not be parsed.\n")
@@ -264,7 +266,6 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			case "name":
 				fallthrough
 			default:
-				fmt.Println("*attachListSort: ", *attachListSort)
 				sort.Slice(attachments, func(i, j int) bool {
 					// this is deliberate reversal to sort the largest items first
 					return attachments[i].Name < attachments[j].Name
@@ -300,6 +301,34 @@ snip rm <uuid ...>            remove snip <uuid> ...
 					fmt.Printf("removed attachment %s\n", id)
 				}
 			}
+
+		// STANDARD OUTPUT
+		case "stdout":
+			// output raw data to stdout for piping or analysis
+			if err := attachGetCmd.Parse(attachCmd.Args()[1:]); err != nil {
+				log.Debug().Err(err).Msg("error parsing attach list arguments")
+				attachGetCmd.Usage()
+				os.Exit(1)
+			}
+
+			if len(attachGetCmd.Args()) != 1 {
+				Usage()
+				os.Exit(1)
+			}
+
+			id, err := uuid.Parse(attachGetCmd.Arg(0))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "The provided id could not be parsed and may be malformed.\n")
+				os.Exit(1)
+			}
+			a, err := snip.GetAttachmentFromUUID(id)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Could not locate attachment with id %s\n", id)
+				log.Debug().Err(err).Str("uuid", id.String()).Msg("could not create attachment from uuid")
+				os.Exit(0)
+			}
+			// output
+			fmt.Printf("%s", a.Data)
 
 		// WRITE attachment to file
 		case "write":
