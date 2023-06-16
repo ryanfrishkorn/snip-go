@@ -287,9 +287,13 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			}
 
 			// print analysis
-			fmt.Printf("%s %s %42s %s\n", "count", "uuid", "size", "name")
 			for idx, a := range attachments {
-				fmt.Printf("%5d %s %10d %s\n", idx+1, a.UUID, a.Size, truncateStr(a.Name, 60))
+				// do not print header if no results
+				if idx == 0 {
+					// print to stderr to easily pipe output
+					fmt.Fprintf(os.Stderr, "%s %42s %s\n", "uuid", "size", "name")
+				}
+				fmt.Printf("%s %10d %s\n", a.UUID, a.Size, truncateStr(a.Name, 60))
 			}
 
 		// REMOVE attachments by uuid
@@ -495,7 +499,10 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				log.Debug().Err(err).Str("uuid", s.UUID.String()).Msg("error obtaining snip from uuid")
 				os.Exit(1)
 			}
-			fmt.Printf("%d %s %s\n", idx+1, s.UUID, s.Name)
+			if idx == 0 {
+				fmt.Fprintf(os.Stderr, "%s %36s\n", "uuid", "name")
+			}
+			fmt.Printf("%s %s\n", s.UUID, s.Name)
 		}
 
 	case "rename":
