@@ -547,19 +547,20 @@ func SearchUUID(term string) ([]Snip, error) {
 }
 
 // WriteAttachment writes the attached file to the current working directory
-func WriteAttachment(id uuid.UUID, outfile string) (int, error) {
+func WriteAttachment(id uuid.UUID, outfile string, forceWrite bool) (int, error) {
 	a, err := GetAttachmentFromUUID(id)
 	if err != nil {
 		log.Debug().Err(err).Str("uuid", id.String()).Msg("error obtaining attachment from id")
 		return 0, err
 	}
 	// attempt to open file for writing using filename
-	// never overwrite data
 	_, err = os.Stat(outfile)
-	if err == nil {
+	if err == nil && forceWrite == false {
+		// ESCAPE HATCH never overwrite data unless the issue is forced
 		log.Debug().Str("filename", a.Name).Msg("stat returned no errors, refusing to overwrite file")
 		return 0, fmt.Errorf("refusing to overwrite file")
 	}
+	// DESTRUCTIVE
 	f, err := os.Create(outfile)
 	if err != nil {
 		log.Debug().Err(err).Msg("error opening new file for writing")

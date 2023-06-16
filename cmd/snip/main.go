@@ -71,6 +71,7 @@ snip rm <uuid ...>            remove snip <uuid> ...
 	attachListSort := attachListCmd.String("sort", "name", "field to sort attachment list by")
 	attachRemoveCmd := flag.NewFlagSet("rm", flag.ExitOnError)
 	attachWriteCmd := flag.NewFlagSet("write", flag.ExitOnError)
+	attachWriteForce := attachWriteCmd.Bool("force", false, "force local file overwrite")
 
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
 	getRawData := getCmd.Bool("raw", false, "output only raw data")
@@ -281,11 +282,18 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			} else {
 				outfile = a.Name
 			}
-			bytesWritten, err := snip.WriteAttachment(a.UUID, outfile)
+			var bytesWritten int
+			if *attachWriteForce == true {
+				// DESTRUCTIVE TO LOCAL DATA
+				// attempt to overwrite file if a local file of the same name exists
+				bytesWritten, err = snip.WriteAttachment(a.UUID, outfile, true)
+			} else {
+				bytesWritten, err = snip.WriteAttachment(a.UUID, outfile, false)
+			}
 			if err != nil {
 				log.Fatal().Err(err).Msg("error writing attachment to file")
 			}
-			fmt.Printf("%s written to %s %d bytes\n", a.Name, outfile, bytesWritten)
+			fmt.Printf("%s written -> %s %d bytes\n", a.Name, outfile, bytesWritten)
 		default:
 			Usage()
 		}
