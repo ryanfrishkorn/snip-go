@@ -69,29 +69,28 @@ snip rm <uuid ...>              remove snip <uuid> ...
 	}
 
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
-	addDataFromFile := addCmd.String("f", "", "use data from specified file")
-	addName := addCmd.String("n", "", "specify name")
+	addCmdFile := addCmd.String("f", "", "use data from specified file")
+	addCmdName := addCmd.String("n", "", "specify name")
 
 	attachCmd := flag.NewFlagSet("attach", flag.ExitOnError)
-	attachGetCmd := flag.NewFlagSet("get", flag.ExitOnError)
-	attachAddCmd := flag.NewFlagSet("add", flag.ExitOnError)
-	attachListCmd := flag.NewFlagSet("ls", flag.ExitOnError)
-	attachListSort := attachListCmd.String("sort", "name", "field to sort attachment list by")
-	attachRemoveCmd := flag.NewFlagSet("rm", flag.ExitOnError)
-	attachWriteCmd := flag.NewFlagSet("write", flag.ExitOnError)
-	attachWriteForce := attachWriteCmd.Bool("force", false, "force local file overwrite")
+	attachCmdGet := flag.NewFlagSet("get", flag.ExitOnError)
+	attachCmdAdd := flag.NewFlagSet("add", flag.ExitOnError)
+	attachCmdList := flag.NewFlagSet("ls", flag.ExitOnError)
+	attachCmdListSort := attachCmdList.String("sort", "name", "field to sort attachment list by")
+	attachCmdRemove := flag.NewFlagSet("rm", flag.ExitOnError)
+	attachCmdWrite := flag.NewFlagSet("write", flag.ExitOnError)
+	attachCmdWriteForce := attachCmdWrite.Bool("force", false, "force local file overwrite")
 
 	getCmd := flag.NewFlagSet("get", flag.ExitOnError)
-	getRawData := getCmd.Bool("raw", false, "output only raw data")
-	getRandom := getCmd.Bool("random", false, "view a random snip")
+	getCmdRaw := getCmd.Bool("raw", false, "output only raw data")
+	getCmdRandom := getCmd.Bool("random", false, "view a random snip")
 
 	listCmd := flag.NewFlagSet("ls", flag.ExitOnError)
 
 	renameCmd := flag.NewFlagSet("rename", flag.ExitOnError)
 
 	searchCmd := flag.NewFlagSet("search", flag.ExitOnError)
-	// fuzzy data search by default unless field is specified
-	searchField := searchCmd.String("f", "data", "field to search")
+	searchCmdField := searchCmd.String("f", "data", "field to search")
 
 	rmCmd := flag.NewFlagSet("rm", flag.ExitOnError)
 
@@ -139,11 +138,11 @@ snip rm <uuid ...>              remove snip <uuid> ...
 		}
 
 		// file input takes precedence, but default to standard input
-		if *addDataFromFile != "" {
-			data, err := readFromFile(*addDataFromFile)
+		if *addCmdFile != "" {
+			data, err := readFromFile(*addCmdFile)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "There was a problem reading from the file %s\n", *addDataFromFile)
-				log.Debug().Err(err).Str("file", *addDataFromFile).Msg("error reading from file")
+				fmt.Fprintf(os.Stderr, "There was a problem reading from the file %s\n", *addCmdFile)
+				log.Debug().Err(err).Str("file", *addCmdFile).Msg("error reading from file")
 				os.Exit(1)
 			}
 			s.Data = data
@@ -156,7 +155,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			}
 			s.Data = data
 		}
-		s.Name = *addName
+		s.Name = *addCmdName
 		// generate name if empty
 		if s.Name == "" {
 			s.Name = s.GenerateName(5)
@@ -187,23 +186,23 @@ snip rm <uuid ...>              remove snip <uuid> ...
 		// LIST attachments with additional info
 		switch attachCmd.Args()[0] {
 		case "add":
-			// attachAddCmd
-			if err := attachAddCmd.Parse(attachCmd.Args()[1:]); err != nil {
+			// attachCmdAdd
+			if err := attachCmdAdd.Parse(attachCmd.Args()[1:]); err != nil {
 				log.Debug().Err(err).Msg("error parsing attach list arguments")
-				attachAddCmd.Usage()
+				attachCmdAdd.Usage()
 				// fmt.Fprintf(os.Stderr, "MARKER MARKER MARKER")
 				os.Exit(1)
 			}
 
 			// should always have at least two arguments, uuid and at least one file
-			if len(attachAddCmd.Args()) < 2 {
+			if len(attachCmdAdd.Args()) < 2 {
 				fmt.Fprintf(os.Stderr, "The attach add command requires at least two arguments, the snip uuid and the local file to attach.\n")
-				log.Debug().Int("length", len(attachAddCmd.Args())).Str("args", strings.Join(attachAddCmd.Args(), " ")).Msg("arguments")
-				attachAddCmd.Usage()
+				log.Debug().Int("length", len(attachCmdAdd.Args())).Str("args", strings.Join(attachCmdAdd.Args(), " ")).Msg("arguments")
+				attachCmdAdd.Usage()
 				os.Exit(1)
 			}
 			// INSERT new attachments
-			id := attachAddCmd.Args()[0]
+			id := attachCmdAdd.Args()[0]
 			// validate UUID
 			s, err := snip.GetFromUUID(id)
 			if err != nil {
@@ -213,7 +212,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			fmt.Printf("attaching files to snip %s %s\n", s.UUID.String(), s.Name)
 			// TODO: Do not allow duplicate attachments by calculating checksums at this point.
 
-			for _, filename := range attachAddCmd.Args()[1:] {
+			for _, filename := range attachCmdAdd.Args()[1:] {
 				// attempt to insert file
 				data, err := os.ReadFile(filename)
 				if err != nil {
@@ -234,7 +233,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			}
 
 		case "ls":
-			if err := attachListCmd.Parse(attachCmd.Args()[1:]); err != nil {
+			if err := attachCmdList.Parse(attachCmd.Args()[1:]); err != nil {
 				fmt.Fprintf(os.Stderr, "The ls arguments could not be parsed.\n")
 				log.Debug().Err(err).Msg("error parsing attach list arguments")
 				os.Exit(1)
@@ -259,7 +258,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				attachments = append(attachments, a)
 			}
 
-			switch *attachListSort {
+			switch *attachCmdListSort {
 			case "size":
 				sort.Slice(attachments, func(i, j int) bool {
 					// this is deliberate reversal to sort the largest items first
@@ -282,14 +281,14 @@ snip rm <uuid ...>              remove snip <uuid> ...
 
 		// REMOVE attachments by uuid
 		case "rm":
-			if err := attachRemoveCmd.Parse(attachCmd.Args()[1:]); err != nil {
+			if err := attachCmdRemove.Parse(attachCmd.Args()[1:]); err != nil {
 				fmt.Fprintf(os.Stderr, "The arguments to the rm command could not be parsed.\n")
 				log.Debug().Err(err).Msg("error parsing attach remove arguments")
-				attachRemoveCmd.Usage()
+				attachCmdRemove.Usage()
 				os.Exit(1)
 			}
 			// TODO: Check this behavior, don't we need [1:] or something?
-			for _, idStr := range attachRemoveCmd.Args() {
+			for _, idStr := range attachCmdRemove.Args() {
 				id, err := uuid.Parse(idStr)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "The supplied id %s could not be validated and may be malformed.\n", idStr)
@@ -307,18 +306,18 @@ snip rm <uuid ...>              remove snip <uuid> ...
 		// STANDARD OUTPUT
 		case "stdout":
 			// output raw data to stdout for piping or analysis
-			if err := attachGetCmd.Parse(attachCmd.Args()[1:]); err != nil {
+			if err := attachCmdGet.Parse(attachCmd.Args()[1:]); err != nil {
 				log.Debug().Err(err).Msg("error parsing attach list arguments")
-				attachGetCmd.Usage()
+				attachCmdGet.Usage()
 				os.Exit(1)
 			}
 
-			if len(attachGetCmd.Args()) != 1 {
+			if len(attachCmdGet.Args()) != 1 {
 				Usage()
 				os.Exit(1)
 			}
 
-			id, err := uuid.Parse(attachGetCmd.Arg(0))
+			id, err := uuid.Parse(attachCmdGet.Arg(0))
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "The provided id could not be parsed and may be malformed.\n")
 				os.Exit(1)
@@ -334,23 +333,23 @@ snip rm <uuid ...>              remove snip <uuid> ...
 
 		// WRITE attachment to file
 		case "write":
-			if err := attachWriteCmd.Parse(attachCmd.Args()[1:]); err != nil {
+			if err := attachCmdWrite.Parse(attachCmd.Args()[1:]); err != nil {
 				fmt.Fprintf(os.Stderr, "The attach write arguments could not be parsed.\n")
 				log.Debug().Err(err).Msg("error parsing attach remove arguments")
-				attachWriteCmd.Usage()
+				attachCmdWrite.Usage()
 				os.Exit(1)
 			}
-			log.Debug().Str("args", strings.Join(attachWriteCmd.Args(), " ")).Msg("arguments")
-			if len(attachWriteCmd.Args()) == 0 || len(attachWriteCmd.Args()) > 2 {
+			log.Debug().Str("args", strings.Join(attachCmdWrite.Args(), " ")).Msg("arguments")
+			if len(attachCmdWrite.Args()) == 0 || len(attachCmdWrite.Args()) > 2 {
 				fmt.Fprintf(os.Stderr, "The attach write command requires either one or two arguments.\n")
-				attachWriteCmd.Usage()
+				attachCmdWrite.Usage()
 				log.Debug().Msg("writing attachment action requires one or two arguments")
 				os.Exit(1)
 			}
 
 			var outfile string
 
-			idStr := attachWriteCmd.Args()[0]
+			idStr := attachCmdWrite.Args()[0]
 			id, err := uuid.Parse(idStr)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "There was a problem attempting to validate the id %s which may be malformed.\n", idStr)
@@ -364,13 +363,13 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				os.Exit(1)
 			}
 			// assign outfile name or use saved name if omitted
-			if len(attachWriteCmd.Args()) == 2 {
-				outfile = attachWriteCmd.Args()[1]
+			if len(attachCmdWrite.Args()) == 2 {
+				outfile = attachCmdWrite.Args()[1]
 			} else {
 				outfile = a.Name
 			}
 			var bytesWritten int
-			if *attachWriteForce == true {
+			if *attachCmdWriteForce == true {
 				// DESTRUCTIVE TO LOCAL DATA
 				// attempt to overwrite file if a local file of the same name exists
 				bytesWritten, err = snip.WriteAttachment(a.UUID, outfile, true)
@@ -397,7 +396,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 		var idStr string
 
 		// random from all snips
-		if *getRandom == true {
+		if *getCmdRandom == true {
 			// get list
 			// TODO: verify that this does not load everything in memory everywhere immediately
 			allSnips, err := snip.List(0)
@@ -446,7 +445,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			os.Exit(1)
 		}
 
-		if *getRawData {
+		if *getCmdRaw {
 			fmt.Printf("%s", s.Data)
 		} else {
 			fmt.Printf("uuid: %s\n", s.UUID.String())
@@ -560,14 +559,14 @@ snip rm <uuid ...>              remove snip <uuid> ...
 
 		var results []snip.Snip
 		term := searchCmd.Args()[0]
-		fmt.Fprintf(os.Stderr, "Searching %s field for: \"%s\"\n", *searchField, term)
-		log.Debug().Str("field", *searchField)
+		fmt.Fprintf(os.Stderr, "Searching %s field for: \"%s\"\n", *searchCmdField, term)
+		log.Debug().Str("field", *searchCmdField)
 
-		switch *searchField {
+		switch *searchCmdField {
 		case "data":
 			results, err = snip.SearchDataTerm(term)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "There was a problem searching %s field for term %s\n", *searchField, term)
+				fmt.Fprintf(os.Stderr, "There was a problem searching %s field for term %s\n", *searchCmdField, term)
 				log.Debug().Err(err).Msg("error while searching for term")
 				os.Exit(1)
 			}
@@ -575,7 +574,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 		case "uuid":
 			results, err = snip.SearchUUID(term)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "There was a problem searching %s field for term %s\n", *searchField, term)
+				fmt.Fprintf(os.Stderr, "There was a problem searching %s field for term %s\n", *searchCmdField, term)
 				log.Debug().Err(err).Msg("error while searching for term")
 				os.Exit(1)
 			}
