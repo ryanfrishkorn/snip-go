@@ -39,28 +39,30 @@ func main() {
 
 	helpMessage :=
 		`usage:
-snip add                      add a new snip from standard input
-       -f <file>              data from file instead of stdin default
-       -n <name>              use specified name
+snip add                        add a new snip from standard input
+       -f <file>                data from file instead of stdin default
+       -n <name>                use specified name
 
-snip attach                   attach a file to specified snip
-       add <uuid> <file ...>  add attachment files to snip
-       get <uuid>             display attachment metadata and info
-       list                   list all attachments in database
-         -sort <size|name>    sort by attachment field (default: name)
-       rm <uuid ...>          remove attachment
-	   stdout <uuid>          write data to stdout
-       write <file>           write data to file
+snip attach                     attach a file to specified snip
+       add <uuid> <file ...>    add attachment files to snip
+       get <uuid>               display attachment metadata and info
+       list                     list all attachments in database
+         -sort <size|name>      sort by attachment field (default: name)
+       rm <uuid ...>            remove attachment
+       stdout <uuid>            write data to stdout
+       write <file>             write data to file
 
-snip get <uuid>               retrieve snip with specified uuid
-       -raw                   output only raw data from snip
+snip get <uuid>                 retrieve snip with specified uuid
+       -raw                     output only raw data from snip
 
-snip ls                       list all snips
+snip ls                         list all snips
 
-snip search <term>            return snips whose data contains given term
-       -f <field>             search snip field
+snip search <term>              return snips whose data contains given term
+       -f <field>               search snip field
 
-snip rm <uuid ...>            remove snip <uuid> ...
+snip rename <uuid> <new_name>   rename snip
+
+snip rm <uuid ...>              remove snip <uuid> ...
 `
 	Usage := func() {
 		fmt.Fprintf(os.Stderr, "%s", helpMessage)
