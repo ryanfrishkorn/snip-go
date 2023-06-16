@@ -31,7 +31,9 @@ func main() {
 	homePath := os.Getenv("HOME")
 	dbFilename := ".snip.sqlite3"
 	if homePath == "" {
-		log.Fatal().Msg("could not retrieve $HOME environment variable")
+		fmt.Fprintf(os.Stderr, "please $HOME env to your home directory for database save location")
+		log.Debug().Msg("could not retrieve $HOME environment variable")
+		os.Exit(1)
 	}
 	dbFilePath := homePath + "/" + dbFilename
 
@@ -58,7 +60,6 @@ snip rm <uuid ...>            remove snip <uuid> ...
 `
 	Usage := func() {
 		fmt.Fprintf(os.Stderr, "%s", helpMessage)
-		os.Exit(1)
 	}
 
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
@@ -90,47 +91,61 @@ snip rm <uuid ...>            remove snip <uuid> ...
 	// establish action
 	if len(os.Args) < 2 {
 		Usage()
+		os.Exit(1)
 	}
 	action := os.Args[1]
 
 	var err error
 	database.Conn, err = sqlite3.Open(dbFilePath)
 	if err != nil {
-		log.Fatal().Err(err).Msg("error opening database")
+		fmt.Fprintf(os.Stderr, "The database could not be opened at this location: %s\n", dbFilePath)
+		log.Debug().Err(err).Str("path", dbFilePath).Msg("error opening database")
+		os.Exit(1)
 	}
 	defer database.Conn.Close()
 
 	// ensure database is present
 	err = snip.CreateNewDatabase()
 	if err != nil {
-		log.Fatal().Err(err).Msg("error opening database")
+		fmt.Fprintf(os.Stderr, "There was a problem creating the new database structure.\n")
+		log.Debug().Err(err).Msg("error creating database schema")
+		os.Exit(1)
 	}
 
 	log.Debug().Str("action", action).Msg("action invoked")
+	log.Debug().Str("args", strings.Join(os.Args, " ")).Msg("action invoked")
 
 	switch action {
 	case "add":
 		if err := addCmd.Parse(os.Args[2:]); err != nil {
-			log.Fatal().Err(err).Msg("error parsing add arguments")
+			fmt.Fprintf(os.Stderr, "The add arguments could not be parsed.\n")
+			log.Debug().Err(err).Msg("error parsing add arguments")
+			os.Exit(1)
 		}
 
 		// create simple object
 		s, err := snip.New()
 		if err != nil {
-			log.Fatal().Msg("could not create new Snip")
+			fmt.Fprintf(os.Stderr, "There was a problem creating a new snip.\n")
+			log.Debug().Err(err).Msg("could not create new Snip")
+			os.Exit(1)
 		}
 
 		// file input takes precedence, but default to standard input
 		if *addDataFromFile != "" {
 			data, err := readFromFile(*addDataFromFile)
 			if err != nil {
-				log.Fatal().Err(err).Msg("error reading from file")
+				fmt.Fprintf(os.Stderr, "There was a problem reading from the file %s\n", *addDataFromFile)
+				log.Debug().Err(err).Str("file", *addDataFromFile).Msg("error reading from file")
+				os.Exit(1)
 			}
 			s.Data = data
 		} else {
 			data, err := readFromStdin()
 			if err != nil {
-				log.Fatal().Msg("error reading from standard input")
+				fmt.Fprintf(os.Stderr, "The standard input could not be read.\n")
+				log.Debug().Err(err).Msg("error reading from standard input")
+				os.Exit(1)
 			}
 			s.Data = data
 		}
@@ -148,13 +163,22 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			Msg("first snip object")
 		err = snip.InsertSnip(s)
 		if err != nil {
-			log.Fatal().Err(err).Msg("error inserting Snip into database")
+			fmt.Fprintf(os.Stderr, "There was a problem inserting the new snip into the database.\n")
+			log.Debug().Err(err).Msg("error inserting Snip into database")
+			os.Exit(1)
 		}
-		fmt.Printf("successfully added snip with uuid: %s\n", s.UUID)
+		fmt.Printf("added snip uuid: %s\n", s.UUID)
 
 	case "attach":
 		if err := attachCmd.Parse(os.Args[2:]); err != nil {
-			log.Fatal().Err(err).Msg("error parsing attach arguments")
+			fmt.Fprintf(os.Stderr, "The attach arguments could not be parsed.\n")
+			log.Debug().Err(err).Msg("error parsing attach arguments")
+			attachCmd.Usage()
+			os.Exit(1)
+		}
+		if len(attachCmd.Args()) < 2 {
+			Usage()
+			os.Exit(1)
 		}
 
 		// LIST attachments with additional info
@@ -162,47 +186,61 @@ snip rm <uuid ...>            remove snip <uuid> ...
 		case "add":
 			// attachAddCmd
 			if err := attachAddCmd.Parse(attachCmd.Args()[1:]); err != nil {
-				log.Fatal().Err(err).Msg("error parsing attach list arguments")
+				log.Debug().Err(err).Msg("error parsing attach list arguments")
+				attachAddCmd.Usage()
+				// fmt.Fprintf(os.Stderr, "MARKER MARKER MARKER")
+				os.Exit(1)
 			}
 
 			// should always have at least two arguments, uuid and at least one file
 			if len(attachAddCmd.Args()) < 2 {
-				log.Debug().Int("length", len(attachAddCmd.Args())).Msg("argument length")
-				log.Debug().Str("args", strings.Join(attachAddCmd.Args(), " ")).Msg("arguments")
-				Usage()
+				fmt.Fprintf(os.Stderr, "The attach add command requires at least two arguments, the snip uuid and the local file to attach.\n")
+				log.Debug().Int("length", len(attachAddCmd.Args())).Str("args", strings.Join(attachAddCmd.Args(), " ")).Msg("arguments")
+				attachAddCmd.Usage()
+				os.Exit(1)
 			}
 			// INSERT new attachments
 			id := attachAddCmd.Args()[0]
-			fmt.Println("id: ", id)
 			// validate UUID
 			s, err := snip.GetFromUUID(id)
 			if err != nil {
-				log.Fatal().Str("uuid", id).Msg("error locating snip uuid")
+				log.Debug().Str("uuid", id).Msg("error locating snip uuid")
+				os.Exit(1)
 			}
+			fmt.Printf("attaching files to snip %s %s\n", s.UUID.String(), s.Name)
+			// TODO: Do not allow duplicate attachments by calculating checksums at this point.
 
 			for _, filename := range attachAddCmd.Args()[1:] {
 				// attempt to insert file
 				data, err := os.ReadFile(filename)
 				if err != nil {
-					log.Fatal().Err(err).Msg("error reading attachment file data")
+					fmt.Fprintf(os.Stderr, "The file %s could not be read.\n", filename)
+					log.Debug().Err(err).Str("file", filename).Msg("error reading attachment file data")
+					os.Exit(1)
 				}
 				basename := path.Base(filename)
 				// name is filename if not supplied
 				err = s.Attach(basename, data)
 				if err != nil {
-					log.Error().Err(err).Str("filename", filename).Msg("error attaching file")
+					fmt.Fprintf(os.Stderr, "The attach operation of the file %s had a problem.\n", filename)
+					log.Debug().Err(err).Str("filename", filename).Msg("error attaching file")
+					// at least attach partial
 					continue
 				}
 				fmt.Printf("attached %s %d bytes\n", filename, len(data))
 			}
 		case "ls":
 			if err := attachListCmd.Parse(attachCmd.Args()[1:]); err != nil {
-				log.Fatal().Err(err).Msg("error parsing attach list arguments")
+				fmt.Fprintf(os.Stderr, "The ls arguments could not be parsed.\n")
+				log.Debug().Err(err).Msg("error parsing attach list arguments")
+				os.Exit(1)
 			}
 
 			list, err := snip.GetAttachmentsAll()
 			if err != nil {
-				log.Fatal().Err(err).Msg("could not list all attachments")
+				fmt.Fprintf(os.Stderr, "There was a problem while gathering the list of attachments.\n")
+				log.Debug().Err(err).Msg("could not list all attachments")
+				os.Exit(1)
 			}
 			// build list
 			// use this function to not load overhead of Data field since it will not be used
@@ -210,7 +248,9 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			for _, id := range list {
 				a, err := snip.GetAttachmentMetadata(id)
 				if err != nil {
-					log.Fatal().Err(err).Str("uuid", id.String()).Msg("error getting attachment metadata")
+					fmt.Fprintf(os.Stderr, "There was a problem when attempting to read metadata of snip with id %s\n", id.String())
+					log.Debug().Err(err).Str("uuid", id.String()).Msg("error getting attachment metadata")
+					os.Exit(1)
 				}
 				attachments = append(attachments, a)
 			}
@@ -240,18 +280,22 @@ snip rm <uuid ...>            remove snip <uuid> ...
 		// REMOVE attachments by uuid
 		case "rm":
 			if err := attachRemoveCmd.Parse(attachCmd.Args()); err != nil {
-				log.Fatal().Err(err).Msg("error parsing attach remove arguments")
+				fmt.Fprintf(os.Stderr, "The arguments to the rm command could not be parsed.\n")
+				log.Debug().Err(err).Msg("error parsing attach remove arguments")
+				attachRemoveCmd.Usage()
+				os.Exit(1)
 			}
+			// TODO: Check this behavior, don't we need [1:] or something?
 			for _, idStr := range attachRemoveCmd.Args() {
 				id, err := uuid.Parse(idStr)
 				if err != nil {
+					fmt.Fprintf(os.Stderr, "The supplied id %s could not be validated and may be malformed.\n", idStr)
 					log.Error().Err(err).Str("uuid", "idStr").Msg("error parsing uuid")
-					fmt.Fprintf(os.Stderr, "could not parse attachment %s", idStr)
 				}
 				err = snip.DeleteAttachment(id)
 				if err != nil {
+					fmt.Fprintf(os.Stderr, "There was a problem while trying to delete attachment %s", idStr)
 					log.Error().Err(err).Str("uuid", idStr).Msg("error removing attachment")
-					fmt.Fprintf(os.Stderr, "could not delete attachment %s", idStr)
 				} else {
 					fmt.Printf("removed attachment %s\n", id)
 				}
@@ -260,12 +304,17 @@ snip rm <uuid ...>            remove snip <uuid> ...
 		// WRITE attachment to file
 		case "write":
 			if err := attachWriteCmd.Parse(attachCmd.Args()[1:]); err != nil {
-				log.Fatal().Err(err).Msg("error parsing attach remove arguments")
+				fmt.Fprintf(os.Stderr, "The attach write arguments could not be parsed.\n")
+				log.Debug().Err(err).Msg("error parsing attach remove arguments")
+				attachWriteCmd.Usage()
+				os.Exit(1)
 			}
 			log.Debug().Str("args", strings.Join(attachWriteCmd.Args(), " ")).Msg("arguments")
 			if len(attachWriteCmd.Args()) == 0 || len(attachWriteCmd.Args()) > 2 {
+				fmt.Fprintf(os.Stderr, "The attach write command requires either one or two arguments.\n")
 				attachWriteCmd.Usage()
-				log.Fatal().Msg("writing attachment action requires one or two arguments")
+				log.Debug().Msg("writing attachment action requires one or two arguments")
+				os.Exit(1)
 			}
 
 			var outfile string
@@ -273,9 +322,16 @@ snip rm <uuid ...>            remove snip <uuid> ...
 			idStr := attachWriteCmd.Args()[0]
 			id, err := uuid.Parse(idStr)
 			if err != nil {
-				log.Fatal().Err(err).Msg("error parsing uuid")
+				fmt.Fprintf(os.Stderr, "There was a problem attempting to validate the id %s which may be malformed.\n", idStr)
+				log.Debug().Err(err).Msg("error parsing uuid")
+				os.Exit(1)
 			}
 			a, err := snip.GetAttachmentFromUUID(id)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "There was a problem locating the attachment with id %s\n", id)
+				log.Debug().Err(err).Str("id", id.String()).Msg("could not get attachment")
+				os.Exit(1)
+			}
 			// assign outfile name or use saved name if omitted
 			if len(attachWriteCmd.Args()) == 2 {
 				outfile = attachWriteCmd.Args()[1]
@@ -291,27 +347,33 @@ snip rm <uuid ...>            remove snip <uuid> ...
 				bytesWritten, err = snip.WriteAttachment(a.UUID, outfile, false)
 			}
 			if err != nil {
-				log.Fatal().Err(err).Msg("error writing attachment to file")
+				fmt.Fprintf(os.Stderr, "There was a problem while writing data for the output file %s\n", outfile)
+				log.Debug().Err(err).Msg("error writing attachment to file")
+				os.Exit(1)
 			}
 			fmt.Printf("%s written -> %s %d bytes\n", a.Name, outfile, bytesWritten)
 		default:
 			Usage()
+			os.Exit(1)
 		}
 
 	case "get":
 		if err := getCmd.Parse(os.Args[2:]); err != nil {
-			log.Fatal().Err(err).Msg("error parsing get arguments")
+			fmt.Fprintf(os.Stderr, "The get arguments could not be parsed.\n")
+			log.Debug().Err(err).Msg("error parsing get arguments")
+			os.Exit(1)
 		}
 		var idStr string
 
 		// random from all snips
 		if *getRandom == true {
-			fmt.Fprintf(os.Stderr, "getting random snip\n")
 			// get list
+			// TODO: verify that this does not load everything in memory everywhere immediately
 			allSnips, err := snip.List(0)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error listing all snips: %v", err)
-				log.Fatal().Err(err).Msg("error retrieving all snips")
+				fmt.Fprintf(os.Stderr, "There was a problem building the list of all snips in the database.\n")
+				log.Debug().Err(err).Msg("error retrieving all snips")
+				os.Exit(1)
 			}
 
 			// get random within range
@@ -324,19 +386,33 @@ snip rm <uuid ...>            remove snip <uuid> ...
 		}
 
 		// obtain uuid specified from argument
+		if len(getCmd.Args()) != 1 {
+			Usage()
+			os.Exit(1)
+		}
+		idStr = getCmd.Args()[0]
+
+		// If this has not been set by anything above, use the command line.
 		if idStr == "" {
-			if len(getCmd.Args()) < 1 {
-				getCmd.Usage()
-				os.Exit(1)
-			}
 			idStr = getCmd.Args()[0]
 		}
-		if err != nil {
-			log.Fatal().Err(err).Msg("error converting from bytes to uuid type")
-		}
+
+		// TODO handle both cases explicitly and derive functions for full and partial uuid
+		// There is no reason to parse this since it may be a fuzzy term. Rely on the errors.
+		/*
+			_, err := uuid.Parse(idStr)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "There was a problem with id %s which may be malformed.\n", idStr)
+				log.Debug().Err(err).Msg("error converting from bytes to uuid type")
+				os.Exit(1)
+			}
+		*/
+
 		s, err := snip.GetFromUUID(idStr)
 		if err != nil {
-			log.Fatal().Err(err).Str("uuid", idStr).Msg("error retrieving snip with uuid")
+			fmt.Fprintf(os.Stderr, "The snip with id %s could not be retrieved.\n", idStr)
+			log.Debug().Err(err).Str("uuid", idStr).Msg("error retrieving snip with uuid")
+			os.Exit(1)
 		}
 
 		if *getRawData {
@@ -358,100 +434,133 @@ snip rm <uuid ...>            remove snip <uuid> ...
 
 	case "ls":
 		if err := listCmd.Parse(os.Args[2:]); err != nil {
-			log.Fatal().Err(err).Msg("error parsing ls arguments")
+			fmt.Fprintf(os.Stderr, "The ls arguments could not be parsed.\n")
+			log.Debug().Err(err).Msg("error parsing ls arguments")
+			listCmd.Usage()
+			os.Exit(1)
 		}
 		results, err := snip.GetAllMetadata()
 		if err != nil {
-			log.Fatal().Err(err).Msg("error listing items")
+			fmt.Fprintf(os.Stderr, "There was a problem while attempting to obtain the metadata of all snips.\n")
+			log.Debug().Err(err).Msg("error listing items metadata")
+			os.Exit(1)
 		}
 		for idx, id := range results {
 			s, err := snip.GetFromUUID(id.String())
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error getting snip uuid: %s\n", id.String())
-				log.Fatal().Err(err).Str("uuid", s.UUID.String()).Msg("error parsing uuid")
+				fmt.Fprintf(os.Stderr, "The snip with uuid: %s could not be obtained from the database.\n", id.String())
+				log.Debug().Err(err).Str("uuid", s.UUID.String()).Msg("error obtaining snip from uuid")
+				os.Exit(1)
 			}
 			fmt.Printf("%d %s %s\n", idx+1, s.UUID, s.Name)
 		}
 
 	case "rename":
 		if err := renameCmd.Parse(os.Args[2:]); err != nil {
-			log.Fatal().Err(err).Msg("error parsing rename arguments")
+			fmt.Fprintf(os.Stderr, "The rename arguments could not be parsed.\n")
+			log.Debug().Err(err).Msg("error parsing rename arguments")
+			renameCmd.Usage()
+			os.Exit(1)
 		}
 		// require one argument
 		if len(renameCmd.Args()) != 2 {
-			fmt.Fprintf(os.Stderr, "rename action requires two arguments\n")
-			log.Fatal().Err(err).Msg("error parsing rename arguments")
+			fmt.Fprintf(os.Stderr, "The rename command requires two arguments.\n")
+			log.Debug().Err(err).Msg("error parsing rename arguments")
+			os.Exit(1)
 		}
 
 		idStr := renameCmd.Args()[0]
 		newName := renameCmd.Args()[1]
 		// no empty strings allowed
 		if newName == "" {
-			fmt.Fprintf(os.Stderr, "new name must not be an empty string\n")
-			log.Fatal().Err(err).Msg("no empty string allowed for renaming")
+			fmt.Fprintf(os.Stderr, "The new name cannot be an empty string.\n")
+			log.Debug().Err(err).Msg("no empty string allowed for renaming")
+			os.Exit(1)
 		}
 		s, err := snip.GetFromUUID(idStr)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "could not retrieve snip with id: %s\n", idStr)
+			log.Debug().Err(err).Str("uuid", idStr).Msg("retrieving snip from uuid")
+			os.Exit(1)
 		}
 		oldName := s.Name
 		s.Name = newName
 		err = s.Update()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error updating snip %s %v", idStr, err)
-			log.Fatal().Err(err).Msg("could not update snip")
+			fmt.Fprintf(os.Stderr, "There was a problem updating snip with id %s\n", idStr)
+			log.Debug().Err(err).Msg("could not update snip")
+			os.Exit(1)
 		}
 		fmt.Printf("renamed %s %s -> %s\n", s.UUID.String(), oldName, newName)
 
 	case "rm":
 		if err := rmCmd.Parse(os.Args[2:]); err != nil {
-			log.Fatal().Err(err).Msg("error parsing rm arguments")
+			fmt.Fprintf(os.Stderr, "The rm arguments could not be parsed.\n")
+			log.Debug().Err(err).Msg("error parsing rm arguments")
+			rmCmd.Usage()
+			os.Exit(1)
 		}
 		for idx, arg := range rmCmd.Args() {
 			// parse to uuid because it seems proper
 			id, err := uuid.Parse(arg)
 			if err != nil {
-				fmt.Printf("ERROR removing %d/%d %s...", idx+1, len(rmCmd.Args()), arg)
+				fmt.Fprintf(os.Stderr, "Could not parse the id of %d/%d %s\n", idx+1, len(rmCmd.Args()), arg)
 				log.Debug().Str("uuid", arg).Err(err).Msg("error parsing uuid input")
+				// Do not exit as others may be valid.
 				continue
 			}
 			err = snip.Delete(id)
 			if err != nil {
-				fmt.Printf("ERROR removing %d/%d %s...", idx+1, len(rmCmd.Args()), arg)
+				fmt.Printf("Could not remove %d/%d %s\n", idx+1, len(rmCmd.Args()), arg)
 				log.Debug().Str("uuid", arg).Err(err).Msg("error while attempting to delete snip")
+			} else {
+				// must else because we don't break
+				fmt.Printf("removed %d/%d %s\n", idx+1, len(rmCmd.Args()), arg)
 			}
-			fmt.Printf("removed %d/%d %s\n", idx+1, len(rmCmd.Args()), arg)
 		}
 
 	case "search":
 		if err := searchCmd.Parse(os.Args[2:]); err != nil {
-			log.Fatal().Err(err).Msg("error parsing search arguments")
+			fmt.Fprintf(os.Stderr, "The search arguments could not be parsed.\n")
+			log.Debug().Err(err).Str("args", strings.Join(searchCmd.Args(), " ")).Msg("error parsing search arguments")
+			searchCmd.Usage()
+			os.Exit(1)
 		}
 
 		var results []snip.Snip
 		term := searchCmd.Args()[0]
-		fmt.Fprintf(os.Stderr, "searching data field for: \"%s\"\n", term)
+		fmt.Fprintf(os.Stderr, "Searching %s field for: \"%s\"\n", *searchField, term)
+		log.Debug().Str("field", *searchField)
+
 		switch *searchField {
 		case "data":
 			results, err = snip.SearchDataTerm(term)
 			if err != nil {
-				log.Fatal().Err(err).Msg("error while searching for term")
+				fmt.Fprintf(os.Stderr, "There was a problem searching %s field for term %s\n", *searchField, term)
+				log.Debug().Err(err).Msg("error while searching for term")
+				os.Exit(1)
 			}
 
 		case "uuid":
 			results, err = snip.SearchUUID(term)
 			if err != nil {
-				log.Fatal().Err(err).Msg("error while searching for term")
+				fmt.Fprintf(os.Stderr, "There was a problem searching %s field for term %s\n", *searchField, term)
+				log.Debug().Err(err).Msg("error while searching for term")
+				os.Exit(1)
 			}
 		}
 
-		// fmt.Printf("results: %d\n\n", len(results))
+		if len(results) <= 0 {
+			fmt.Fprintf(os.Stderr, "No results for term \"%s\"\n", term)
+			os.Exit(0)
+		}
 		for idx, s := range results {
 			fmt.Printf("%d uuid: %s name: %s\n", idx+1, s.UUID.String(), s.Name)
 		}
 
 	default:
 		Usage()
+		os.Exit(1)
 	}
 
 	log.Debug().Msg("program execution complete")

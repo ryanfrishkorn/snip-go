@@ -154,7 +154,7 @@ func Delete(id uuid.UUID) error {
 // DeleteAttachment deletes an attachment from the database
 func DeleteAttachment(id uuid.UUID) error {
 	// remove
-	stmt, err := database.Conn.Prepare(`DELETE from snip_attachment WHERE uuid = '?'`, id.String())
+	stmt, err := database.Conn.Prepare(`DELETE FROM snip_attachment WHERE uuid = ?`, id.String())
 	if err != nil {
 		return err
 	}
@@ -245,7 +245,6 @@ func GetAttachments(searchUUID uuid.UUID) ([]Attachment, error) {
 	if err != nil {
 		return attachments, err
 	}
-	log.Debug()
 
 	for _, id := range ids {
 		a, err := GetAttachmentFromUUID(id)
