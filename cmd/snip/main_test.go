@@ -16,7 +16,7 @@ var (
 	appName     string
 	appPath     string
 	workingPath string
-	dbName      = "test.sqlite"
+	dbName      = "testing/test.sqlite"
 )
 
 func TestMain(m *testing.M) {
@@ -45,13 +45,24 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "error setting db path for testing: %v\n", err)
 		os.Exit(1)
 	}
+
+	fmt.Printf("building test database...\n")
+	err = AddDataCSV()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+	}
+
 	fmt.Printf("running tests...\n")
 	result := m.Run()
 
 	// remove binary after testing
-	err = os.Remove(appName)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error removing testing binary\n")
+	if err = os.Remove(appName); err != nil {
+		fmt.Fprintf(os.Stderr, "error removing testing binary: %s\n", appName)
+		os.Exit(1)
+	}
+	// remove test database
+	if err = os.Remove(dbName); err != nil {
+		fmt.Fprintf(os.Stderr, "error removing testing database: %s\n", dbName)
 		os.Exit(1)
 	}
 
@@ -59,7 +70,25 @@ func TestMain(m *testing.M) {
 }
 
 // AddData adds test data
-func AddData(t *testing.T) {
+func AddDataCSV() error {
+	// TODO check for exising database, we must create it from scratch
+	_, err := os.Stat(dbName)
+	if err == nil {
+		return fmt.Errorf("test database %s already exists, remove and test again", dbName)
+	}
+
+	cmd := exec.Command("sqlite3", dbName, ".mode csv", ".import --csv testing/snip.csv snip")
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("error during snip CSV import: %v", err)
+	}
+
+	cmd = exec.Command("sqlite3", dbName, ".mode csv", ".import --csv testing/snip_attachment.csv snip_attachment")
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("error during snip_attachment CSV import: %v", err)
+	}
+	return nil
 }
 
 func TestList(t *testing.T) {
