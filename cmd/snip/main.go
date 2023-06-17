@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 func main() {
@@ -293,7 +294,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 					// print to stderr to easily pipe output
 					fmt.Fprintf(os.Stderr, "%s %42s %s\n", "uuid", "size", "name")
 				}
-				fmt.Printf("%s %10d %s\n", a.UUID, a.Size, truncateStr(a.Name, 60))
+				fmt.Printf("%s %10d %s\n", a.UUID, a.Size, a.Name)
 			}
 
 		// REMOVE attachments by uuid
@@ -472,10 +473,13 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			fmt.Printf("----\n")
 			fmt.Printf("%s", s.Data)
 			fmt.Printf("\n----\n")
-			// print attachments if present
-			fmt.Printf("attachments:\n")
 			for idx, a := range s.Attachments {
-				fmt.Printf("  %d - %s %s %d bytes\n", idx, a.UUID.String(), a.Name, a.Size)
+				// print attachments if present
+				if idx == 0 {
+					fmt.Printf("attachments:\n")
+					fmt.Printf("%s %42s %s\n", "uuid", "bytes", "name")
+				}
+				fmt.Printf("%s %10d %s\n", a.UUID.String(), a.Size, a.Name)
 			}
 		}
 
@@ -636,23 +640,24 @@ func readFromStdin() ([]byte, error) {
 }
 
 // truncateStr returns a new string limited to max chars
-func truncateStr(text string, max int) string {
+func truncateStr(text string, max int, suffix string) string {
 	// trade empty for empty
-	if len(text) == 0 {
+	if text == "" {
 		return ""
 	}
 
 	cutoff := max
-	suffix := false
-	if len(text) > max {
-		suffix = true
-		cutoff = max - 3
+	truncate := false
+	// use runes
+	if utf8.RuneCountInString(text) > max {
+		truncate = true
+		cutoff = max - len(suffix)
 	}
-	if suffix == true {
+	if truncate == true {
 		if len(text) <= cutoff {
-			return text + "..."
+			return text + suffix
 		} else {
-			return text[:cutoff] + "..."
+			return text[:cutoff] + suffix
 		}
 	}
 	return text
