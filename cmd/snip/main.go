@@ -445,17 +445,8 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			idStr = getCmd.Args()[0]
 		}
 
-		// TODO handle both cases explicitly and derive functions for full and partial uuid
 		// There is no reason to parse this since it may be a fuzzy term. Rely on the errors.
-		/*
-			_, err := uuid.Parse(idStr)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "There was a problem with id %s which may be malformed.\n", idStr)
-				log.Debug().Err(err).Msg("error converting from bytes to uuid type")
-				os.Exit(1)
-			}
-		*/
-
+		// TODO handle both cases explicitly and derive functions for full and partial uuid
 		s, err := snip.GetFromUUID(idStr)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "The snip with id %s could not be retrieved.\n", idStr)
