@@ -58,65 +58,66 @@ func TestMain(m *testing.M) {
 	os.Exit(result)
 }
 
+// AddData adds test data
+func AddData(t *testing.T) {
+}
+
 func TestList(t *testing.T) {
 	snipCount := 3   // number of snips in test database
 	snipColumns := 2 // number of output columns when listing
 
-	t.Run("List", func(t *testing.T) {
-		cmd := exec.Command(appPath, "ls")
-		stdoutPipe, err := cmd.StdoutPipe()
+	cmd := exec.Command(appPath, "ls")
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Errorf("error opening stdout pipe: %v", err)
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+
+	// read from program stdout
+	buffer := bufio.NewReader(stdoutPipe)
+	var outputLines []string
+
+	for {
+		line, err := buffer.ReadBytes('\n')
 		if err != nil {
-			t.Errorf("error opening stdout pipe: %v", err)
-		}
-
-		err = cmd.Start()
-		if err != nil {
-			t.Fatalf("expected nil err, got %v", err)
-		}
-
-		// read from program stdout
-		buffer := bufio.NewReader(stdoutPipe)
-		var outputLines []string
-
-		for {
-			line, err := buffer.ReadBytes('\n')
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				t.Fatal("error reading line")
+			if errors.Is(err, io.EOF) {
+				break
 			}
-			outputLines = append(outputLines, string(line))
+			t.Fatal("error reading line")
 		}
+		outputLines = append(outputLines, string(line))
+	}
 
-		err = cmd.Wait()
-		if err != nil {
-			t.Errorf("error waiting for stdout pipe: %v", err)
-		}
+	err = cmd.Wait()
+	if err != nil {
+		t.Errorf("error waiting for stdout pipe: %v", err)
+	}
 
-		// process output
-		if len(outputLines) == 0 {
-			t.Fatal("expected some bytes read from stdout pipe, got zero")
-		}
-		if len(outputLines) != snipCount {
-			t.Errorf("expected %d lines, got %d", snipCount, len(outputLines))
-			t.Errorf("line: %v", outputLines)
-		}
+	// process output
+	if len(outputLines) == 0 {
+		t.Fatal("expected some bytes read from stdout pipe, got zero")
+	}
+	if len(outputLines) != snipCount {
+		t.Errorf("expected %d lines, got %d", snipCount, len(outputLines))
+	}
 
-		var ids []string
-		for _, line := range outputLines {
-			lineSplit := strings.Split(line, " ")
-			if len(lineSplit) < 2 {
-				t.Errorf("expected at least %d columns in list output, got %d", snipColumns, len(lineSplit))
-			}
-			ids = append(ids, lineSplit[0])
+	var ids []string
+	for _, line := range outputLines {
+		lineSplit := strings.Split(line, " ")
+		if len(lineSplit) < 2 {
+			t.Errorf("expected at least %d columns in list output, got %d", snipColumns, len(lineSplit))
 		}
-		// only check for expected uuids, since other display aspects are likely to change
-		expectedIDs := []string{"65f6930f-e970-4b6e-b10c-fca3dac21c1e", "990a917e-66d3-404b-9502-e8341964730b", "412f7ca8-824c-4c70-80f0-4cca6371e45a"}
-		for idx, id := range expectedIDs {
-			if ids[idx] != id {
-				t.Errorf("expected id %s, got %s", expectedIDs[idx], id)
-			}
+		ids = append(ids, lineSplit[0])
+	}
+	// only check for expected uuids, since other display aspects are likely to change
+	expectedIDs := []string{"65f6930f-e970-4b6e-b10c-fca3dac21c1e", "990a917e-66d3-404b-9502-e8341964730b", "412f7ca8-824c-4c70-80f0-4cca6371e45a"}
+	for idx, id := range expectedIDs {
+		if ids[idx] != id {
+			t.Errorf("expected id %s, got %s", expectedIDs[idx], id)
 		}
-	})
+	}
 }
