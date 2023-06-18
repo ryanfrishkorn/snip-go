@@ -89,6 +89,15 @@ func (s *Snip) Update() error {
 			break
 		}
 		count++
+
+		var n int
+		err = stmt.Scan(&n)
+		if err != nil {
+			return fmt.Errorf("error scanning for value during update preliminary check")
+		}
+		if n != 1 {
+			return fmt.Errorf("count query returned more than one row, meaning uuid may have duplicate entries")
+		}
 	}
 
 	if count != 1 {

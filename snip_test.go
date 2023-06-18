@@ -120,3 +120,41 @@ func TestSnip_GenerateName(t *testing.T) {
 		t.Errorf(`expected string "%s", got "%s"`, expected, modified)
 	}
 }
+
+func TestSnip_Update(t *testing.T) {
+	s, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := s.UUID
+	s.Data = DataTest
+	s.Name = "test"
+	err = InsertSnip(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// cleanup - leave it the way you found it
+	defer func() {
+		err := Delete(id)
+		if err != nil {
+			t.Fatalf("delete function returned error: %v", err)
+		}
+	}()
+
+	s.Name = "test2"
+	err = s.Update()
+	if err != nil {
+		t.Fatalf("Update returned error: %v", err)
+	}
+
+	c, err := GetFromUUID(id.String())
+	if err != nil {
+		t.Error(err)
+	}
+	if c.Name != "test2" {
+		// update must have failed
+		t.Error("database update failed")
+	}
+	// TODO modify and verify changes on all fields
+}
