@@ -74,6 +74,8 @@ func (s *Snip) Update() error {
 	if err != nil {
 		return err
 	}
+	defer stmt.Close()
+
 	// update
 	err = stmt.Exec()
 	if err != nil {
@@ -103,19 +105,19 @@ func (s *Snip) Update() error {
 	if count != 1 {
 		return fmt.Errorf("should have returned 1 snip record, found %d", count)
 	}
-	stmt.Close()
 
 	// FIXME handle attachments
 	// update the record
-	stmt, err = database.Conn.Prepare(`UPDATE snip SET (data, timestamp, name) = (?, ?, ?) WHERE uuid = ?`)
+	stmt2, err := database.Conn.Prepare(`UPDATE snip SET (data, timestamp, name) = (?, ?, ?) WHERE uuid = ?`)
 	if err != nil {
 		return err
 	}
-	err = stmt.Exec(string(s.Data), s.Timestamp.Format(time.RFC3339Nano), s.Name, s.UUID.String())
+	defer stmt2.Close()
+
+	err = stmt2.Exec(string(s.Data), s.Timestamp.Format(time.RFC3339Nano), s.Name, s.UUID.String())
 	if err != nil {
 		return err
 	}
-	stmt.Close()
 	return nil
 }
 
@@ -152,11 +154,11 @@ func Delete(id uuid.UUID) error {
 	if err != nil {
 		return err
 	}
+	defer stmt.Close()
 	err = stmt.Exec()
 	if err != nil {
 		return err
 	}
-	stmt.Close()
 	return nil
 }
 
@@ -167,11 +169,11 @@ func DeleteAttachment(id uuid.UUID) error {
 	if err != nil {
 		return err
 	}
+	defer stmt.Close()
 	err = stmt.Exec()
 	if err != nil {
 		return err
 	}
-	stmt.Close()
 	return nil
 }
 
@@ -182,11 +184,12 @@ func GetAllMetadata() ([]uuid.UUID, error) {
 	if err != nil {
 		return snipIDs, err
 	}
+	defer stmt.Close()
+
 	err = stmt.Exec()
 	if err != nil {
 		return snipIDs, err
 	}
-	defer stmt.Close()
 
 	for {
 		hasRow, err := stmt.Step()
@@ -218,11 +221,12 @@ func GetAttachmentsAll() ([]uuid.UUID, error) {
 	if err != nil {
 		return attachmentIDs, err
 	}
+	defer stmt.Close()
+
 	err = stmt.Exec()
 	if err != nil {
 		return attachmentIDs, err
 	}
-	defer stmt.Close()
 
 	for {
 		hasRow, err := stmt.Step()
@@ -273,6 +277,8 @@ func GetAttachmentsUUID(snipUUID uuid.UUID) ([]uuid.UUID, error) {
 	if err != nil {
 		return results, err
 	}
+	defer stmt.Close()
+
 	err = stmt.Exec(snipUUID.String())
 	if err != nil {
 		return results, err

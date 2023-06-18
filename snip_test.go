@@ -20,13 +20,20 @@ func TestMain(m *testing.M) {
 	database.Conn, err = sqlite3.Open(DatabasePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error opening sqlite test database")
+		os.Exit(1)
 	}
 	code := m.Run()
 
 	// remove database after all tests have run
+	err = database.Conn.Close()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error closing test database %s: %v", DatabasePath, err)
+		os.Exit(1)
+	}
 	err = os.Remove(DatabasePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error removing temporary testing database %s: %v", DatabasePath, err)
+		fmt.Fprintf(os.Stderr, "error removing temporary test database %s: %v", DatabasePath, err)
+		os.Exit(1)
 	}
 	os.Exit(code)
 }
