@@ -71,11 +71,12 @@ func GetAttachmentMetadata(searchUUID uuid.UUID) (Attachment, error) {
 	return a, nil
 }
 
-func GetAttachmentFromUUID(searchUUID uuid.UUID) (Attachment, error) {
+func GetAttachmentFromUUID(searchUUID string) (Attachment, error) {
 	a := Attachment{}
 
+	searchUUIDFuzzy := "%" + searchUUID + "%"
 	var stmt *sqlite3.Stmt
-	stmt, err := database.Conn.Prepare(`SELECT data, size, snip_uuid, timestamp, name FROM snip_attachment WHERE uuid = ?`, searchUUID.String())
+	stmt, err := database.Conn.Prepare(`SELECT uuid, data, name, size, snip_uuid, timestamp FROM snip_attachment WHERE uuid LIKE ?`, searchUUIDFuzzy)
 	if err != nil {
 		return a, err
 	}
@@ -98,19 +99,20 @@ func GetAttachmentFromUUID(searchUUID uuid.UUID) (Attachment, error) {
 		}
 
 		var (
+			id        string
 			data      string
+			name      string
 			size      string
 			snipUUID  string
 			timestamp string
-			name      string
 		)
-		err = stmt.Scan(&data, &size, &snipUUID, &timestamp, &name)
+		err = stmt.Scan(&id, &data, &name, &size, &snipUUID, &timestamp)
 		if err != nil {
 			return a, err
 		}
-		a.UUID = searchUUID
+		a.UUID, err = uuid.Parse(id)
 		if err != nil {
-			return a, fmt.Errorf("error parsing uuid string into struct")
+			return a, fmt.Errorf("error parsing uuid string into uuid type")
 		}
 		a.Data = []byte(data)
 		a.Size, err = strconv.Atoi(size)

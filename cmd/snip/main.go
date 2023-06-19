@@ -340,7 +340,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				fmt.Fprintf(os.Stderr, "The provided id could not be parsed and may be malformed.\n")
 				os.Exit(1)
 			}
-			a, err := snip.GetAttachmentFromUUID(id)
+			a, err := snip.GetAttachmentFromUUID(id.String())
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Could not locate attachment with id %s\n", id)
 				log.Debug().Err(err).Str("uuid", id.String()).Msg("could not create attachment from uuid")
@@ -368,16 +368,19 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			var outfile string
 
 			idStr := attachCmdWrite.Args()[0]
-			id, err := uuid.Parse(idStr)
+			// keep this a string
+			/*
+				id, err := uuid.Parse(idStr)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "There was a problem attempting to validate the id %s which may be malformed.\n", idStr)
+					log.Debug().Err(err).Msg("error parsing uuid")
+					os.Exit(1)
+				}
+			*/
+			a, err := snip.GetAttachmentFromUUID(idStr)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "There was a problem attempting to validate the id %s which may be malformed.\n", idStr)
-				log.Debug().Err(err).Msg("error parsing uuid")
-				os.Exit(1)
-			}
-			a, err := snip.GetAttachmentFromUUID(id)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "There was a problem locating the attachment with id %s\n", id)
-				log.Debug().Err(err).Str("id", id.String()).Msg("could not get attachment")
+				fmt.Fprintf(os.Stderr, "There was a problem locating the attachment with id %s\n", idStr)
+				log.Debug().Err(err).Str("id", idStr).Msg("could not get attachment")
 				os.Exit(1)
 			}
 			// assign outfile name or use saved name if omitted

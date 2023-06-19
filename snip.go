@@ -260,7 +260,7 @@ func GetAttachments(searchUUID uuid.UUID) ([]Attachment, error) {
 	}
 
 	for _, id := range ids {
-		a, err := GetAttachmentFromUUID(id)
+		a, err := GetAttachmentFromUUID(id.String())
 		if err != nil {
 			return attachments, err
 		}
@@ -562,7 +562,7 @@ func SearchUUID(term string) ([]Snip, error) {
 
 // WriteAttachment writes the attached file to the current working directory
 func WriteAttachment(id uuid.UUID, outfile string, forceWrite bool) (int, error) {
-	a, err := GetAttachmentFromUUID(id)
+	a, err := GetAttachmentFromUUID(id.String())
 	if err != nil {
 		log.Debug().Err(err).Str("uuid", id.String()).Msg("error obtaining attachment from id")
 		return 0, err
