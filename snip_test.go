@@ -17,7 +17,7 @@ var UUIDTest = uuid.New()
 var DataTest = []byte("this is VeRy UnIQu3 sample data, and stemming is good for searching")
 var NameTest = "Test Snip of the Century"
 
-// AddData adds test data
+// AddData adds data to the test database
 func AddDataCSV() error {
 	// TODO check for exising database, we must create it from scratch
 	_, err := os.Stat(DatabasePath)
@@ -133,12 +133,12 @@ func TestFlattenString(t *testing.T) {
 	}
 }
 
-func TestSnip_CountWords(t *testing.T) {
+func TestSnipCountWords(t *testing.T) {
 	s, err := New()
 	if err != nil {
 		t.Errorf("error generating new snip: %v", err)
 	}
-	s.Data = []byte("This data contains eight words in its entirety")
+	s.Data = []byte("This data\tcontains  eight words\nin its entirety.")
 	expected := 8
 	count := s.CountWords()
 	if expected != count {
@@ -146,7 +146,7 @@ func TestSnip_CountWords(t *testing.T) {
 	}
 }
 
-func TestSnip_GenerateName(t *testing.T) {
+func TestSnipGenerateName(t *testing.T) {
 	s, err := New()
 	if err != nil {
 		t.Errorf("error generating new snip: %v", err)
@@ -160,7 +160,7 @@ func TestSnip_GenerateName(t *testing.T) {
 	}
 }
 
-func TestSnip_Update(t *testing.T) {
+func TestSnipUpdate(t *testing.T) {
 	s, err := New()
 	if err != nil {
 		t.Fatal(err)
@@ -198,7 +198,7 @@ func TestSnip_Update(t *testing.T) {
 	// TODO modify and verify changes on all fields
 }
 
-func TestSnip_Index(t *testing.T) {
+func TestSnipIndex(t *testing.T) {
 	ids, err := GetAllSnipIDs()
 	if err != nil {
 		t.Errorf("could not get all snip ids: %v", err)

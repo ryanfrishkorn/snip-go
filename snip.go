@@ -53,7 +53,8 @@ func (s *Snip) Attach(name string, data []byte) error {
 // CountWords returns an integer estimating the number of words in data
 func (s *Snip) CountWords() int {
 	data := FlattenString(string(s.Data))
-	return len(strings.Split(data, " "))
+	re := regexp.MustCompile(`\s+`)
+	return len(re.Split(data, -1))
 }
 
 // GenerateName returns a clean string derived from processing the data field
@@ -70,8 +71,7 @@ func (s *Snip) Index() error {
 	// parse into valid words
 	var wordsEmbedded []string
 	for _, w := range strings.Split(string(wordsBytes), "\n") {
-		// log.Debug().Str("word", string(w)).Msg("embed process")
-		wordsEmbedded = append(wordsEmbedded, string(w))
+		wordsEmbedded = append(wordsEmbedded, w)
 	}
 	wordsJoined := strings.Join(wordsEmbedded, " ")
 
@@ -81,9 +81,8 @@ func (s *Snip) Index() error {
 	}
 	wordsStemmed := strings.Split(wordsJoinedStemmed, " ")
 
-	// remove stop words from dict
+	// TODO: remove stop words from dict
 
-	// SNIP DATA
 	// remove commas and periods
 	dataCleaned := strings.ReplaceAll(string(s.Data), ". ", " ")
 	dataCleaned = strings.ReplaceAll(dataCleaned, ", ", " ")
@@ -98,7 +97,6 @@ func (s *Snip) Index() error {
 	}
 
 	// build terms and counts
-	// var terms map[string]int
 	terms := make(map[string]int, 0)
 	for _, term := range dataStemmedSplit {
 		// determine if term has already been processed
@@ -110,20 +108,17 @@ func (s *Snip) Index() error {
 
 		// determine if stem is valid
 		valid := false
-		wordsCount := 0
 		for _, wordStem := range wordsStemmed {
-			wordsCount++
 			if wordStem == term {
 				valid = true
 				break
 			}
 		}
-		// break to next term if we cannot validate from word dictionary
 		if valid == false {
 			continue
 		}
 
-		// count excluding self
+		// count occurrences
 		count := 0
 		func() {
 			for _, t := range dataStemmedSplit {
