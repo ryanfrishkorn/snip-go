@@ -61,7 +61,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "error closing test database %s: %v", DatabasePath, err)
 		os.Exit(1)
 	}
-	// err = os.Remove(DatabasePath)
+	err = os.Remove(DatabasePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error removing temporary test database %s: %v", DatabasePath, err)
 		os.Exit(1)
@@ -99,7 +99,7 @@ func TestInsertSnip(t *testing.T) {
 		t.Errorf("error creating new snip")
 	}
 	s.Name = NameTest
-	s.Data = []byte(DataTest)
+	s.Data = DataTest
 
 	// hijack for testing
 	s.UUID = UUIDTest

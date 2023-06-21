@@ -1,6 +1,7 @@
 package snip
 
 import (
+	"embed"
 	"fmt"
 	"github.com/bvinc/go-sqlite-lite/sqlite3"
 	"github.com/google/uuid"
@@ -11,6 +12,12 @@ import (
 	"regexp"
 	"strings"
 	"time"
+)
+
+var (
+	//go:embed words_princeton.txt
+	f             embed.FS
+	wordsBytes, _ = f.ReadFile("words_princeton.txt")
 )
 
 // Snip represents a snippet of data with additional metadata
@@ -74,9 +81,13 @@ func ReadDictionary(path string) ([]string, error) {
 // Index stems all data and writes it to a search table
 func (s *Snip) Index() error {
 	// parse into valid words
+	var wordsEmbedded []string
+	for _, w := range strings.Split(string(wordsBytes), "\n") {
+		// log.Debug().Str("word", string(w)).Msg("embed process")
+		wordsEmbedded = append(wordsEmbedded, string(w))
+	}
+	wordsJoined := strings.Join(wordsEmbedded, " ")
 
-	// WORDS DATA
-	wordsJoined := strings.Join(wordsAll, " ")
 	wordsJoinedStemmed, err := snowball.Stem(wordsJoined, "english", true)
 	if err != nil {
 		return err
