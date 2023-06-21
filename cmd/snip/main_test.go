@@ -16,7 +16,7 @@ var (
 	appName     string
 	appPath     string
 	workingPath string
-	dbName      = "testing/test.sqlite"
+	dbName      = "test.sqlite"
 )
 
 func TestMain(m *testing.M) {
@@ -50,6 +50,7 @@ func TestMain(m *testing.M) {
 	err = AddDataCSV()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
 	}
 
 	fmt.Printf("running tests...\n")
@@ -77,13 +78,13 @@ func AddDataCSV() error {
 		return fmt.Errorf("test database %s already exists, remove and test again", dbName)
 	}
 
-	cmd := exec.Command("sqlite3", dbName, ".mode csv", ".import --csv testing/snip.csv snip")
+	cmd := exec.Command("sqlite3", dbName, ".mode csv", ".import --csv ../../testing/snip.csv snip")
 	err = cmd.Run()
 	if err != nil {
 		return fmt.Errorf("error during snip CSV import: %v", err)
 	}
 
-	cmd = exec.Command("sqlite3", dbName, ".mode csv", ".import --csv testing/snip_attachment.csv snip_attachment")
+	cmd = exec.Command("sqlite3", dbName, ".mode csv", ".import --csv ../../testing/snip_attachment.csv snip_attachment")
 	err = cmd.Run()
 	if err != nil {
 		return fmt.Errorf("error during snip_attachment CSV import: %v", err)

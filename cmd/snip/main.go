@@ -606,6 +606,38 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			fmt.Printf("%d uuid: %s name: %s\n", idx+1, s.UUID.String(), s.Name)
 		}
 
+	case "index":
+		// rebuild index
+		fmt.Fprintf(os.Stderr, "dropping index...")
+		err := snip.DropIndex()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error")
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "success\n")
+
+		fmt.Fprintf(os.Stderr, "indexing...")
+
+		ids, err := snip.GetAllSnipIDs()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error")
+			os.Exit(1)
+		}
+		for _, id := range ids {
+			s, err := snip.GetFromUUID(id.String())
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error")
+				os.Exit(1)
+			}
+			err = s.Index()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error indexing item %s\n", s.UUID)
+				os.Exit(1)
+			}
+		}
+		fmt.Fprintf(os.Stderr, "success\n")
+
 	default:
 		Usage()
 		os.Exit(1)

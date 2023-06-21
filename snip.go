@@ -65,19 +65,6 @@ func (s *Snip) GenerateName(wordCount int) string {
 	return strings.Join(name, " ")
 }
 
-// ReadDictionary reads a standard unix dict and returns a lower cased array
-func ReadDictionary(path string) ([]string, error) {
-	var dict []string
-
-	_, err := os.Stat(path)
-	if err != nil {
-		return dict, err
-	}
-	data, err := os.ReadFile(path)
-	dict = strings.Split(string(data), "\n")
-	return dict, nil
-}
-
 // Index stems all data and writes it to a search table
 func (s *Snip) Index() error {
 	// parse into valid words
@@ -146,7 +133,7 @@ func (s *Snip) Index() error {
 			}
 		}()
 		terms[term] = count
-		log.Debug().Str("term", term).Int("count", count).Msg("indexing stem")
+		// log.Debug().Str("term", term).Int("count", count).Msg("indexing stem")
 	}
 	for term, count := range terms {
 		err := s.SetIndexTermCount(term, count)
@@ -275,6 +262,19 @@ func DeleteAttachment(id uuid.UUID) error {
 		return err
 	}
 	defer stmt.Close()
+	err = stmt.Exec()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// DropIndex drops the search index from the database
+func DropIndex() error {
+	stmt, err := database.Conn.Prepare(`DELETE FROM snip_index`)
+	if err != nil {
+		return err
+	}
 	err = stmt.Exec()
 	if err != nil {
 		return err
