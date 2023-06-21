@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/bvinc/go-sqlite-lite/sqlite3"
 	"github.com/google/uuid"
+	"github.com/kljensen/snowball"
 	"github.com/rs/zerolog/log"
 	"github.com/ryanfrishkorn/snip/database"
 	"os"
@@ -55,6 +56,95 @@ func (s *Snip) GenerateName(wordCount int) string {
 	pattern := regexp.MustCompile(`\w+`)
 	name := pattern.FindAllString(data, wordCount)
 	return strings.Join(name, " ")
+}
+
+// ReadDictionary reads a standard unix dict and returns a lower cased array
+func ReadDictionary(path string) ([]string, error) {
+	var dict []string
+
+	_, err := os.Stat(path)
+	if err != nil {
+		return dict, err
+	}
+	data, err := os.ReadFile(path)
+	dict = strings.Split(string(data), "\n")
+	return dict, nil
+}
+
+// Index stems all data and writes it to a search table
+func (s *Snip) Index() error {
+	// parse into valid words
+
+	// WORDS DATA
+	wordsJoined := strings.Join(wordsAll, " ")
+	wordsJoinedStemmed, err := snowball.Stem(wordsJoined, "english", true)
+	if err != nil {
+		return err
+	}
+	wordsStemmed := strings.Split(wordsJoinedStemmed, " ")
+
+	// remove stop words from dict
+
+	// SNIP DATA
+	// remove commas and periods
+	dataCleaned := strings.ReplaceAll(string(s.Data), ". ", " ")
+	dataCleaned = strings.ReplaceAll(dataCleaned, ", ", " ")
+
+	dataStemmed, err := snowball.Stem(dataCleaned, "english", true)
+	if err != nil {
+		return err
+	}
+	dataStemmedSplit := strings.Split(dataStemmed, " ")
+	if err != nil {
+		return err
+	}
+
+	// build terms and counts
+	// var terms map[string]int
+	terms := make(map[string]int, 0)
+	for _, term := range dataStemmedSplit {
+		// determine if term has already been processed
+		_, ok := terms[term]
+		if ok {
+			// skip
+			continue
+		}
+
+		// determine if stem is valid
+		valid := false
+		wordsCount := 0
+		for _, wordStem := range wordsStemmed {
+			wordsCount++
+			if wordStem == term {
+				valid = true
+				break
+			}
+		}
+		// break to next term if we cannot validate from word dictionary
+		if valid == false {
+			continue
+		}
+
+		// count excluding self
+		count := 0
+		func() {
+			for _, t := range dataStemmedSplit {
+				if term == t {
+					count++
+				}
+			}
+		}()
+		terms[term] = count
+		log.Debug().Str("term", term).Int("count", count).Msg("indexing stem")
+	}
+	for term, count := range terms {
+		err := s.SetIndexTermCount(term, count)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Rename updates the name field of a snip
@@ -132,6 +222,10 @@ func CreateNewDatabase() error {
 	if err != nil {
 		return err
 	}
+	err = database.Conn.Exec(`CREATE TABLE IF NOT EXISTS snip_index(term TEXT, uuid TEXT, count INTEGER)`)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -177,7 +271,8 @@ func DeleteAttachment(id uuid.UUID) error {
 	return nil
 }
 
-func GetAllMetadata() ([]uuid.UUID, error) {
+// GetAllSnipIDs returns a slice of all known snip uuids
+func GetAllSnipIDs() ([]uuid.UUID, error) {
 	var snipIDs []uuid.UUID
 
 	stmt, err := database.Conn.Prepare(`SELECT uuid from snip`)
@@ -419,6 +514,66 @@ func InsertSnip(s Snip) error {
 		return err
 	}
 	return nil
+}
+
+// SetIndexTermCount inserts or updates the count of a term indexed
+func (s *Snip) SetIndexTermCount(term string, count int) error {
+	countCurrent, err := GetIndexTermCount(term, s.UUID)
+	if err != nil {
+		return err
+	}
+
+	var stmt *sqlite3.Stmt
+	if countCurrent != 0 {
+		// remove current count and replace with new count
+		stmt, err = database.Conn.Prepare(`UPDATE snip_index SET count = ? WHERE term = ? AND uuid = ?`)
+		if err != nil {
+			return err
+		}
+		err = stmt.Exec(count, term, s.UUID.String())
+		if err != nil {
+			return err
+		}
+	} else {
+		stmt, err = database.Conn.Prepare(`INSERT INTO snip_index (term, uuid, count) VALUES (?, ?, ?)`)
+		if err != nil {
+			return err
+		}
+		err = stmt.Exec(term, s.UUID.String(), count)
+		if err != nil {
+			return err
+		}
+	}
+	stmt.Close()
+	return nil
+}
+
+// GetIndexTermCount returns the index count for a term matching id
+func GetIndexTermCount(term string, id uuid.UUID) (int, error) {
+	var matches = 0
+	// return zero if nothing matches (which should not be present in database)
+	stmt, err := database.Conn.Prepare(`SELECT count from snip_index WHERE term = ? AND uuid = ?`)
+	if err != nil {
+		return matches, err
+	}
+	defer stmt.Close()
+
+	err = stmt.Exec(term, id.String())
+	if err != nil {
+		return matches, err
+	}
+	hasRow, err := stmt.Step()
+	if err != nil {
+		return matches, err
+	}
+	if !hasRow {
+		return matches, err
+	}
+	err = stmt.Scan(&matches)
+	if err != nil {
+		return matches, err
+	}
+	return matches, nil
 }
 
 // List returns a slice of all Snips in the database

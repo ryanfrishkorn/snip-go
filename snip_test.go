@@ -7,16 +7,47 @@ import (
 	"github.com/google/uuid"
 	"github.com/ryanfrishkorn/snip/database"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 )
 
 var DatabasePath = "test.sqlite3"
 var UUIDTest = uuid.New()
-var DataTest = []byte("this is VeRy UnIQu3 sample data")
+var DataTest = []byte("this is VeRy UnIQu3 sample data, and stemming is good for searching")
+var NameTest = "Test Snip of the Century"
+
+// AddData adds test data
+func AddDataCSV() error {
+	// TODO check for exising database, we must create it from scratch
+	_, err := os.Stat(DatabasePath)
+	if err == nil {
+		return fmt.Errorf("test database %s already exists, remove and test again", DatabasePath)
+	}
+
+	cmd := exec.Command("sqlite3", DatabasePath, ".mode csv", ".import --csv testing/snip.csv snip")
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("error during snip CSV import: %v", err)
+	}
+
+	cmd = exec.Command("sqlite3", DatabasePath, ".mode csv", ".import --csv testing/snip_attachment.csv snip_attachment")
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("error during snip_attachment CSV import: %v", err)
+	}
+	return nil
+}
 
 func TestMain(m *testing.M) {
 	var err error
+
+	err = AddDataCSV()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error importing CSV data to test database: %v", err)
+		os.Exit(1)
+	}
+	fmt.Fprintf(os.Stderr, "finished CSV import\n")
 	database.Conn, err = sqlite3.Open(DatabasePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error opening sqlite test database")
@@ -30,7 +61,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "error closing test database %s: %v", DatabasePath, err)
 		os.Exit(1)
 	}
-	err = os.Remove(DatabasePath)
+	// err = os.Remove(DatabasePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error removing temporary test database %s: %v", DatabasePath, err)
 		os.Exit(1)
@@ -67,6 +98,7 @@ func TestInsertSnip(t *testing.T) {
 	if err != nil {
 		t.Errorf("error creating new snip")
 	}
+	s.Name = NameTest
 	s.Data = []byte(DataTest)
 
 	// hijack for testing
@@ -164,4 +196,23 @@ func TestSnip_Update(t *testing.T) {
 		t.Error("database update failed")
 	}
 	// TODO modify and verify changes on all fields
+}
+
+func TestSnip_Index(t *testing.T) {
+	ids, err := GetAllSnipIDs()
+	if err != nil {
+		t.Errorf("could not get all snip ids: %v", err)
+	}
+
+	for _, id := range ids {
+		s, err := GetFromUUID(id.String())
+		if err != nil {
+			t.Error(err)
+		}
+
+		err = s.Index()
+		if err != nil {
+			t.Error(err)
+		}
+	}
 }

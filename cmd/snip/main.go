@@ -484,7 +484,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			listCmd.Usage()
 			os.Exit(1)
 		}
-		results, err := snip.GetAllMetadata()
+		results, err := snip.GetAllSnipIDs()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "There was a problem while attempting to obtain the metadata of all snips.\n")
 			log.Debug().Err(err).Msg("error listing items metadata")
