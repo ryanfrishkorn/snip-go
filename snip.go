@@ -647,8 +647,8 @@ func SearchDataTerm(term string) ([]Snip, error) {
 		return searchResult, fmt.Errorf("refusing to search for empty string")
 	}
 
-	// make term search fuzzy
-	termFuzzy := "%" + term + "%"
+	// modify term for fuzziness
+	termFuzzy := "% " + term + " %"
 	stmt, err := database.Conn.Prepare(`SELECT uuid from snip where data LIKE ?`, termFuzzy)
 	if err != nil {
 		return searchResult, err
