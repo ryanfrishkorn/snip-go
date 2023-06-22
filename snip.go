@@ -503,11 +503,6 @@ func GetFromUUID(searchUUID string) (Snip, error) {
 
 // InsertSnip adds a new Snip to the database
 func InsertSnip(s Snip) error {
-	// do not insert without data
-	if len(s.Data) == 0 {
-		return fmt.Errorf("refusing to insert zero-length data")
-	}
-
 	stmt, err := database.Conn.Prepare(`INSERT INTO snip VALUES (?, ?, ?, ?)`)
 	if err != nil {
 		return err

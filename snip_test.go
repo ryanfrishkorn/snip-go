@@ -2,10 +2,13 @@ package snip
 
 import (
 	"bytes"
+	"compress/gzip"
+	"encoding/xml"
 	"fmt"
 	"github.com/bvinc/go-sqlite-lite/sqlite3"
 	"github.com/google/uuid"
 	"github.com/ryanfrishkorn/snip/database"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -17,7 +20,7 @@ var UUIDTest = uuid.New()
 var DataTest = []byte("this is VeRy UnIQu3 sample data, and stemming is good for searching")
 var NameTest = "Test Snip of the Century"
 
-// AddData adds data to the test database
+// AddDataCSV adds data to the test database
 func AddDataCSV() error {
 	// TODO check for exising database, we must create it from scratch
 	_, err := os.Stat(DatabasePath)
@@ -39,28 +42,100 @@ func AddDataCSV() error {
 	return nil
 }
 
+// AddWikiData converts xml data to snip objects and adds them for testing
+func AddWikiData(file string) error {
+	type article struct {
+		Title    string `xml:"title"`
+		Url      string `xml:"url"`
+		Abstract string `xml:"abstract"`
+	}
+
+	type doc struct {
+		Articles []article `xml:"doc"`
+	}
+
+	f, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	zr, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	defer zr.Close()
+
+	d := xml.NewDecoder(zr)
+	for {
+		t, tokenErr := d.Token()
+		if tokenErr != nil {
+			if tokenErr == io.EOF {
+				break
+			}
+			return fmt.Errorf("decoding token: %v", err)
+		}
+		switch t := t.(type) {
+		case xml.StartElement:
+			if t.Name.Local == "doc" {
+				var doc article
+				if err := d.DecodeElement(&doc, &t); err != nil {
+					return err
+				}
+				// log.Debug().Str("title", doc.Title).Msg("document parsed")
+
+				s, err := New()
+				s.Data = []byte(doc.Abstract)
+				s.Name = doc.Title
+
+				err = InsertSnip(s)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func TestMain(m *testing.M) {
 	var err error
 
+	// add basic data from CSV before opening database below
 	err = AddDataCSV()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error importing CSV data to test database: %v", err)
 		os.Exit(1)
 	}
 	fmt.Fprintf(os.Stderr, "finished CSV import\n")
+
 	database.Conn, err = sqlite3.Open(DatabasePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error opening sqlite test database")
 		os.Exit(1)
 	}
+
+	// close database after all tests have run
+	defer func() {
+		database.Conn.Close()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error closing test database %s: %v", DatabasePath, err)
+			os.Exit(1)
+		}
+	}()
+
+	/*
+		err = AddWikiData("testing/enwiki-20230601-abstract-partial.xml.gz")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error importing Wikipedia data to test database: %v", err)
+			os.Exit(1)
+		}
+	*/
+
 	code := m.Run()
 
-	// remove database after all tests have run
-	err = database.Conn.Close()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error closing test database %s: %v", DatabasePath, err)
-		os.Exit(1)
-	}
+	// remove database file
 	err = os.Remove(DatabasePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error removing temporary test database %s: %v", DatabasePath, err)
