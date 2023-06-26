@@ -38,6 +38,9 @@ func GetAttachmentMetadata(searchUUID uuid.UUID) (Attachment, error) {
 	resultCount := 0
 	for {
 		hasRow, err := stmt.Step()
+		if err != nil {
+			return a, err
+		}
 		if !hasRow {
 			break
 		}
@@ -62,7 +65,13 @@ func GetAttachmentMetadata(searchUUID uuid.UUID) (Attachment, error) {
 			return a, fmt.Errorf("error parsing uuid string into struct")
 		}
 		a.Size, err = strconv.Atoi(size)
+		if err != nil {
+			return a, err
+		}
 		a.Timestamp, err = time.Parse(time.RFC3339Nano, timestamp)
+		if err != nil {
+			return a, err
+		}
 		a.Name = name
 	}
 	if resultCount == 0 {
@@ -89,6 +98,9 @@ func GetAttachmentFromUUID(searchUUID string) (Attachment, error) {
 	resultCount := 0
 	for {
 		hasRow, err := stmt.Step()
+		if err != nil {
+			return a, err
+		}
 		if !hasRow {
 			break
 		}
@@ -116,7 +128,13 @@ func GetAttachmentFromUUID(searchUUID string) (Attachment, error) {
 		}
 		a.Data = []byte(data)
 		a.Size, err = strconv.Atoi(size)
+		if err != nil {
+			return a, err
+		}
 		a.Timestamp, err = time.Parse(time.RFC3339Nano, timestamp)
+		if err != nil {
+			return a, err
+		}
 		a.Name = name
 	}
 	if resultCount == 0 {

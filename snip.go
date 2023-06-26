@@ -43,7 +43,7 @@ func (s *Snip) Attach(name string, data []byte) error {
 	}
 	defer stmt.Close()
 
-	err = stmt.Exec(a.UUID.String(), a.SnipUUID.String(), a.Timestamp.String(), a.Name, a.Data, len(a.Data))
+	err = stmt.Exec(a.UUID.String(), a.SnipUUID.String(), a.Timestamp.Format(time.RFC3339Nano), a.Name, a.Data, len(a.Data))
 	if err != nil {
 		return err
 	}
@@ -70,9 +70,12 @@ func (s *Snip) GenerateName(wordCount int) string {
 func (s *Snip) Index() error {
 	// parse into valid words
 	var wordsEmbedded []string
-	for _, w := range strings.Split(string(wordsBytes), "\n") {
-		wordsEmbedded = append(wordsEmbedded, w)
-	}
+	/*
+		for _, w := range strings.Split(string(wordsBytes), "\n") {
+			wordsEmbedded = append(wordsEmbedded, w)
+		}
+	*/
+	wordsEmbedded = append(wordsEmbedded, strings.Split(string(wordsBytes), "\n")...)
 	wordsJoined := strings.Join(wordsEmbedded, " ")
 
 	wordsJoinedStemmed, err := snowball.Stem(wordsJoined, "english", true)
@@ -114,7 +117,7 @@ func (s *Snip) Index() error {
 				break
 			}
 		}
-		if valid == false {
+		if !valid {
 			continue
 		}
 
@@ -388,6 +391,9 @@ func GetAttachmentsUUID(snipUUID uuid.UUID) ([]uuid.UUID, error) {
 	resultCount := 0
 	for {
 		hasRow, err := stmt.Step()
+		if err != nil {
+			return results, err
+		}
 		if !hasRow {
 			break
 		}
@@ -482,8 +488,8 @@ func GetFromUUID(searchUUID string) (Snip, error) {
 		if err != nil {
 			return s, fmt.Errorf("error parsing uuid string into struct")
 		}
-		s.Timestamp, err = time.Parse(time.RFC3339Nano, timestamp)
 		s.Name = name
+		s.Timestamp, err = time.Parse(time.RFC3339Nano, timestamp)
 		if err != nil {
 			return s, err
 		}
@@ -598,6 +604,9 @@ func List(limit int) ([]Snip, error) {
 
 	for {
 		hasRow, err := stmt.Step()
+		if err != nil {
+			return results, err
+		}
 		if !hasRow {
 			break
 		}
@@ -618,6 +627,9 @@ func List(limit int) ([]Snip, error) {
 		}
 
 		timestamp, err := time.Parse(time.RFC3339Nano, timestampStr)
+		if err != nil {
+			return results, err
+		}
 		// construct item
 		s := Snip{
 			UUID:      id,
@@ -631,13 +643,13 @@ func List(limit int) ([]Snip, error) {
 }
 
 // New returns a new snippet and generates a new UUID for it
-func New() (Snip, error) {
+func New() Snip {
 	return Snip{
 		Data:      []byte{},
 		Timestamp: time.Now(),
 		Name:      "",
 		UUID:      uuid.New(),
-	}, nil
+	}
 }
 
 // SearchDataTerm returns a slice of Snips whose data matches supplied terms
@@ -657,6 +669,9 @@ func SearchDataTerm(term string) ([]Snip, error) {
 
 	for {
 		hasRow, err := stmt.Step()
+		if err != nil {
+			return searchResult, err
+		}
 		if !hasRow {
 			break
 		}
@@ -725,7 +740,7 @@ func WriteAttachment(id uuid.UUID, outfile string, forceWrite bool) (int, error)
 	}
 	// attempt to open file for writing using filename
 	_, err = os.Stat(outfile)
-	if err == nil && forceWrite == false {
+	if err == nil && !forceWrite {
 		// ESCAPE HATCH never overwrite data unless the issue is forced
 		log.Debug().Str("filename", a.Name).Msg("stat returned no errors, refusing to overwrite file")
 		return 0, fmt.Errorf("refusing to overwrite file")

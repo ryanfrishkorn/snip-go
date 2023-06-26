@@ -135,12 +135,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 		}
 
 		// create simple object
-		s, err := snip.New()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "There was a problem creating a new snip.\n")
-			log.Debug().Err(err).Msg("could not create new Snip")
-			os.Exit(1)
-		}
+		s := snip.New()
 
 		// file input takes precedence, but default to standard input
 		if *addCmdFile != "" {
@@ -390,7 +385,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				outfile = a.Name
 			}
 			var bytesWritten int
-			if *attachCmdWriteForce == true {
+			if *attachCmdWriteForce {
 				// DESTRUCTIVE TO LOCAL DATA
 				// attempt to overwrite file if a local file of the same name exists
 				bytesWritten, err = snip.WriteAttachment(a.UUID, outfile, true)
@@ -417,7 +412,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 		var idStr string
 
 		// random from all snips
-		if *getCmdRandom == true {
+		if *getCmdRandom {
 			// get list
 			// TODO: verify that this does not load everything in memory everywhere immediately
 			allSnips, err := snip.List(0)
@@ -679,7 +674,7 @@ func truncateStr(text string, max int, suffix string) string {
 		truncate = true
 		cutoff = max - len(suffix)
 	}
-	if truncate == true {
+	if truncate {
 		if len(text) <= cutoff {
 			return text + suffix
 		} else {

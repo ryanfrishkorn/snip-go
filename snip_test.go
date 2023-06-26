@@ -84,7 +84,7 @@ func AddWikiData(file string) error {
 				}
 				// log.Debug().Str("title", doc.Title).Msg("document parsed")
 
-				s, err := New()
+				s := New()
 				s.Data = []byte(doc.Abstract)
 				s.Name = doc.Title
 
@@ -145,10 +145,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestNew(t *testing.T) {
-	result, err := New()
-	if err != nil {
-		t.Errorf("error creating new snip struct: %v", err)
-	}
+	result := New()
 
 	// default empty bytes
 	if len(result.Data) != 0 {
@@ -169,10 +166,7 @@ func TestInsertSnip(t *testing.T) {
 		t.Errorf("error createing new sqlite database: %v", err)
 	}
 
-	s, err := New()
-	if err != nil {
-		t.Errorf("error creating new snip")
-	}
+	s := New()
 	s.Name = NameTest
 	s.Data = DataTest
 
@@ -194,7 +188,8 @@ func TestGetFromUUID(t *testing.T) {
 	if s.UUID != UUIDTest {
 		t.Errorf("expected UUID of %s, got %s", UUIDTest.String(), s.UUID.String())
 	}
-	if bytes.Compare(s.Data, DataTest) != 0 {
+	// if bytes.Compare(s.Data, DataTest) != 0 {
+	if !bytes.Equal(s.Data, DataTest) {
 		t.Errorf("expected snip data and DataTest to be equal, Compare returned non-zero")
 	}
 }
@@ -209,10 +204,7 @@ func TestFlattenString(t *testing.T) {
 }
 
 func TestSnipCountWords(t *testing.T) {
-	s, err := New()
-	if err != nil {
-		t.Errorf("error generating new snip: %v", err)
-	}
+	s := New()
 	s.Data = []byte("This data\tcontains  eight words\nin its entirety.")
 	expected := 8
 	count := s.CountWords()
@@ -222,10 +214,7 @@ func TestSnipCountWords(t *testing.T) {
 }
 
 func TestSnipGenerateName(t *testing.T) {
-	s, err := New()
-	if err != nil {
-		t.Errorf("error generating new snip: %v", err)
-	}
+	s := New()
 	s.Data = []byte("My day   at\n the\taquarium started out")
 
 	expected := "My day at the aquarium"
@@ -236,14 +225,11 @@ func TestSnipGenerateName(t *testing.T) {
 }
 
 func TestSnipUpdate(t *testing.T) {
-	s, err := New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	s := New()
 	id := s.UUID
 	s.Data = DataTest
 	s.Name = "test"
-	err = InsertSnip(s)
+	err := InsertSnip(s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +268,7 @@ func TestSnipIndex(t *testing.T) {
 	for _, id := range ids {
 		s, err := GetFromUUID(id.String())
 		if err != nil {
-			t.Error(err)
+			t.Errorf("could not obtain snip %s: %v", id, err)
 		}
 
 		err = s.Index()
