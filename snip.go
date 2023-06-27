@@ -81,8 +81,8 @@ func (s *Snip) Index() error {
 	var dataStemmed []string
 
 	wordsEmbedded = append(wordsEmbedded, strings.Split(string(wordsBytes), "\n")...)
-	log.Debug().Int("wordsEmbedded", len(wordsEmbedded)).Msg("word dict count")
-	log.Debug().Str("wordsEmbedded[0]", wordsEmbedded[0]).Msg("first word")
+	// log.Debug().Int("wordsEmbedded", len(wordsEmbedded)).Msg("word dict count")
+	// log.Debug().Str("wordsEmbedded[0]", wordsEmbedded[0]).Msg("first word")
 	// FIXME - this stem dictionary should be reused so as to not do the work for every snip
 	for _, word := range wordsEmbedded {
 		stem, err := snowball.Stem(word, "english", true)
@@ -91,8 +91,8 @@ func (s *Snip) Index() error {
 		}
 		wordsStemmed = append(wordsStemmed, stem)
 	}
-	log.Debug().Int("wordsStemmed", len(wordsStemmed)).Msg("word stem count")
-	log.Debug().Str("wordsStemmed[0]", wordsStemmed[0]).Msg("first stem")
+	// log.Debug().Int("wordsStemmed", len(wordsStemmed)).Msg("word stem count")
+	// log.Debug().Str("wordsStemmed[0]", wordsStemmed[0]).Msg("first stem")
 
 	// TODO: remove stop words from dict
 
