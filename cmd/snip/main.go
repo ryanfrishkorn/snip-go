@@ -593,7 +593,14 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			}
 			// fmt.Printf("%v\n", searchResults)
 			for idx, result := range searchResults {
-				fmt.Printf("%d - %s %d\n", idx+1, result.UUID, result.Count)
+				// obtain full snip for more data
+				s, err := snip.GetFromUUID(result.UUID.String())
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "There was a problem retrieving metadata for snip %s.\n", result.UUID.String())
+					log.Debug().Err(err).Msg("retrieving snip via uuid")
+					os.Exit(1)
+				}
+				fmt.Printf("%d - %s %d %s\n", idx+1, s.UUID.String(), result.Count, s.Name)
 			}
 			if len(searchResults) <= 0 {
 				fmt.Fprintf(os.Stderr, "No results for term \"%s\"\n", term)
