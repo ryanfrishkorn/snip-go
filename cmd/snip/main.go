@@ -186,6 +186,13 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			os.Exit(1)
 		}
 		fmt.Printf("added snip uuid: %s\n", s.UUID)
+		// index for searching
+		err = s.Index()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "There was a problem indexing the new snip item.\n")
+			log.Debug().Err(err).Str("uuid", s.UUID.String()).Msg("error indexing new snip %s")
+			os.Exit(1)
+		}
 
 	case "attach":
 		if err := attachCmd.Parse(os.Args[2:]); err != nil {
