@@ -153,6 +153,38 @@ func (s *Snip) Rename(newName string) error {
 	return nil
 }
 
+// SetIndexTermCount inserts or updates the count of a term indexed
+func (s *Snip) SetIndexTermCount(term string, count int) error {
+	countCurrent, err := GetIndexTermCount(term, s.UUID)
+	if err != nil {
+		return err
+	}
+
+	var stmt *sqlite3.Stmt
+	if countCurrent != 0 {
+		// remove current count and replace with new count
+		stmt, err = database.Conn.Prepare(`UPDATE snip_index SET count = ? WHERE term = ? AND uuid = ?`)
+		if err != nil {
+			return err
+		}
+		err = stmt.Exec(count, term, s.UUID.String())
+		if err != nil {
+			return err
+		}
+	} else {
+		stmt, err = database.Conn.Prepare(`INSERT INTO snip_index (term, uuid, count) VALUES (?, ?, ?)`)
+		if err != nil {
+			return err
+		}
+		err = stmt.Exec(term, s.UUID.String(), count)
+		if err != nil {
+			return err
+		}
+	}
+	stmt.Close()
+	return nil
+}
+
 // Update writes all fields, overwriting existing snip data
 func (s *Snip) Update() error {
 	// verify that current record is present and unique
@@ -280,6 +312,18 @@ func DropIndex() error {
 	return nil
 }
 
+// FlattenString returns a string with all newline, tabs, and spaces squeezed
+func FlattenString(input string) string {
+	// remove newlines and tabs
+	dataSummary := strings.ReplaceAll(input, "\n", " ")
+	dataSummary = strings.ReplaceAll(dataSummary, "\t", " ")
+	// squeeze whitespace
+	pattern := regexp.MustCompile(` +`)
+	dataSummary = pattern.ReplaceAllString(dataSummary, " ")
+
+	return dataSummary
+}
+
 // GetAllSnipIDs returns a slice of all known snip uuids
 func GetAllSnipIDs() ([]uuid.UUID, error) {
 	var snipIDs []uuid.UUID
@@ -317,6 +361,25 @@ func GetAllSnipIDs() ([]uuid.UUID, error) {
 	return snipIDs, nil
 }
 
+// GetAttachments returns a slice of Attachment associated with the supplied snip uuid
+func GetAttachments(searchUUID uuid.UUID) ([]Attachment, error) {
+	var attachments []Attachment
+
+	ids, err := GetAttachmentsUUID(searchUUID)
+	if err != nil {
+		return attachments, err
+	}
+
+	for _, id := range ids {
+		a, err := GetAttachmentFromUUID(id.String())
+		if err != nil {
+			return attachments, err
+		}
+		attachments = append(attachments, a)
+	}
+	return attachments, nil
+}
+
 // GetAttachmentsAll returns a slice of uuids for all attachments in the system
 func GetAttachmentsAll() ([]uuid.UUID, error) {
 	var attachmentIDs []uuid.UUID
@@ -352,25 +415,6 @@ func GetAttachmentsAll() ([]uuid.UUID, error) {
 		attachmentIDs = append(attachmentIDs, id)
 	}
 	return attachmentIDs, nil
-}
-
-// GetAttachments returns a slice of Attachment associated with the supplied snip uuid
-func GetAttachments(searchUUID uuid.UUID) ([]Attachment, error) {
-	var attachments []Attachment
-
-	ids, err := GetAttachmentsUUID(searchUUID)
-	if err != nil {
-		return attachments, err
-	}
-
-	for _, id := range ids {
-		a, err := GetAttachmentFromUUID(id.String())
-		if err != nil {
-			return attachments, err
-		}
-		attachments = append(attachments, a)
-	}
-	return attachments, nil
 }
 
 // GetAttachmentsUUID returns a slice of attachment uuids associated with supplied snip uuid
@@ -411,18 +455,6 @@ func GetAttachmentsUUID(snipUUID uuid.UUID) ([]uuid.UUID, error) {
 		results = append(results, id)
 	}
 	return results, nil
-}
-
-// FlattenString returns a string with all newline, tabs, and spaces squeezed
-func FlattenString(input string) string {
-	// remove newlines and tabs
-	dataSummary := strings.ReplaceAll(input, "\n", " ")
-	dataSummary = strings.ReplaceAll(dataSummary, "\t", " ")
-	// squeeze whitespace
-	pattern := regexp.MustCompile(` +`)
-	dataSummary = pattern.ReplaceAllString(dataSummary, " ")
-
-	return dataSummary
 }
 
 // GetFromUUID retrieves a single Snip by its unique identifier
@@ -507,54 +539,6 @@ func GetFromUUID(searchUUID string) (Snip, error) {
 	return s, nil
 }
 
-// InsertSnip adds a new Snip to the database
-func InsertSnip(s Snip) error {
-	stmt, err := database.Conn.Prepare(`INSERT INTO snip VALUES (?, ?, ?, ?)`)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	// reference
-	err = stmt.Exec(s.UUID.String(), s.Timestamp.Format(time.RFC3339Nano), s.Name, string(s.Data))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// SetIndexTermCount inserts or updates the count of a term indexed
-func (s *Snip) SetIndexTermCount(term string, count int) error {
-	countCurrent, err := GetIndexTermCount(term, s.UUID)
-	if err != nil {
-		return err
-	}
-
-	var stmt *sqlite3.Stmt
-	if countCurrent != 0 {
-		// remove current count and replace with new count
-		stmt, err = database.Conn.Prepare(`UPDATE snip_index SET count = ? WHERE term = ? AND uuid = ?`)
-		if err != nil {
-			return err
-		}
-		err = stmt.Exec(count, term, s.UUID.String())
-		if err != nil {
-			return err
-		}
-	} else {
-		stmt, err = database.Conn.Prepare(`INSERT INTO snip_index (term, uuid, count) VALUES (?, ?, ?)`)
-		if err != nil {
-			return err
-		}
-		err = stmt.Exec(term, s.UUID.String(), count)
-		if err != nil {
-			return err
-		}
-	}
-	stmt.Close()
-	return nil
-}
-
 // GetIndexTermCount returns the index count for a term matching id
 func GetIndexTermCount(term string, id uuid.UUID) (int, error) {
 	var matches = 0
@@ -581,6 +565,22 @@ func GetIndexTermCount(term string, id uuid.UUID) (int, error) {
 		return matches, err
 	}
 	return matches, nil
+}
+
+// InsertSnip adds a new Snip to the database
+func InsertSnip(s Snip) error {
+	stmt, err := database.Conn.Prepare(`INSERT INTO snip VALUES (?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	// reference
+	err = stmt.Exec(s.UUID.String(), s.Timestamp.Format(time.RFC3339Nano), s.Name, string(s.Data))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // List returns a slice of all Snips in the database

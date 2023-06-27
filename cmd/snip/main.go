@@ -41,8 +41,8 @@ func main() {
 		dbFilePath = homePath + "/" + dbFilename
 	}
 
-	helpMessage :=
-		`usage:
+	helpMessage := `
+usage:
 snip add                        add a new snip from standard input
        -f <file>                data from file instead of stdin default
        -n <name>                use specified name
