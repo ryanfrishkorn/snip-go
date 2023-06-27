@@ -136,13 +136,11 @@ func (s *Snip) Index() error {
 
 		// count occurrences
 		count := 0
-		func() {
-			for _, t := range dataStemmed {
-				if term == t {
-					count++
-				}
+		for _, t := range dataStemmed {
+			if term == t {
+				count++
 			}
-		}()
+		}
 		terms[term] = count
 		// log.Debug().Str("term", term).Int("count", count).Msg("indexing stem")
 	}
@@ -673,7 +671,7 @@ func SearchDataTerm(term string) ([]Snip, error) {
 	}
 
 	// modify term for fuzziness
-	termFuzzy := "% " + term + " %"
+	termFuzzy := "%" + term + "%"
 	stmt, err := database.Conn.Prepare(`SELECT uuid from snip where data LIKE ?`, termFuzzy)
 	if err != nil {
 		return searchResult, err
