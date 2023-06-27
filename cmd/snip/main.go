@@ -95,7 +95,8 @@ snip rm <uuid ...>              remove snip <uuid> ...
 	renameCmd := flag.NewFlagSet("rename", flag.ExitOnError)
 
 	searchCmd := flag.NewFlagSet("search", flag.ExitOnError)
-	searchCmdField := searchCmd.String("f", "data", "field to search")
+	searchCmdField := searchCmd.String("f", "data", "field to search (data|uuid)")
+	searchCmdType := searchCmd.String("type", "index", "search type (data|index)")
 
 	rmCmd := flag.NewFlagSet("rm", flag.ExitOnError)
 
@@ -570,35 +571,57 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			os.Exit(1)
 		}
 
-		var results []snip.Snip
 		term := searchCmd.Args()[0]
-		fmt.Fprintf(os.Stderr, "Searching %s field for: \"%s\"\n", *searchCmdField, term)
-		log.Debug().Str("field", *searchCmdField)
 
-		switch *searchCmdField {
+		var snipResults []snip.Snip
+		var searchResults []snip.SearchResult
+		switch *searchCmdType {
+		case "index":
+			fmt.Fprintf(os.Stderr, "Search type %s for: \"%s\"\n", *searchCmdType, term)
+			searchResults, err = snip.SearchIndexTerm(term, 0)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "There was a problem searching the index for term %s\n", term)
+				log.Debug().Err(err).Msg("error while searching for term")
+				os.Exit(1)
+			}
+			// fmt.Printf("%v\n", searchResults)
+			for idx, result := range searchResults {
+				fmt.Printf("%d - %s %d\n", idx+1, result.UUID, result.Count)
+			}
+			if len(searchResults) <= 0 {
+				fmt.Fprintf(os.Stderr, "No results for term \"%s\"\n", term)
+				os.Exit(0)
+			}
+
 		case "data":
-			results, err = snip.SearchDataTerm(term)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "There was a problem searching %s field for term %s\n", *searchCmdField, term)
-				log.Debug().Err(err).Msg("error while searching for term")
-				os.Exit(1)
+			fmt.Fprintf(os.Stderr, "Search type %s on field %s for: \"%s\"\n", *searchCmdType, *searchCmdField, term)
+			log.Debug().Str("field", *searchCmdField)
+
+			switch *searchCmdField {
+			case "data":
+				snipResults, err = snip.SearchDataTerm(term)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "There was a problem searching %s field for term %s\n", *searchCmdField, term)
+					log.Debug().Err(err).Msg("error while searching for term")
+					os.Exit(1)
+				}
+
+			case "uuid":
+				snipResults, err = snip.SearchUUID(term)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "There was a problem searching %s field for term %s\n", *searchCmdField, term)
+					log.Debug().Err(err).Msg("error while searching for term")
+					os.Exit(1)
+				}
 			}
 
-		case "uuid":
-			results, err = snip.SearchUUID(term)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "There was a problem searching %s field for term %s\n", *searchCmdField, term)
-				log.Debug().Err(err).Msg("error while searching for term")
-				os.Exit(1)
+			if len(snipResults) <= 0 {
+				fmt.Fprintf(os.Stderr, "No results for term \"%s\"\n", term)
+				os.Exit(0)
 			}
-		}
-
-		if len(results) <= 0 {
-			fmt.Fprintf(os.Stderr, "No results for term \"%s\"\n", term)
-			os.Exit(0)
-		}
-		for idx, s := range results {
-			fmt.Printf("%d uuid: %s name: %s\n", idx+1, s.UUID.String(), s.Name)
+			for idx, s := range snipResults {
+				fmt.Printf("%d uuid: %s name: %s\n", idx+1, s.UUID.String(), s.Name)
+			}
 		}
 
 	case "index":
@@ -625,6 +648,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				fmt.Fprintf(os.Stderr, "error")
 				os.Exit(1)
 			}
+			log.Debug().Str("uuid", s.UUID.String()).Msg("indexing snip")
 			err = s.Index()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error indexing item %s\n", s.UUID)

@@ -20,6 +20,13 @@ var (
 	wordsBytes, _ = f.ReadFile("words_princeton.txt")
 )
 
+// SearchResult contains info about a search term frequency from the index
+type SearchResult struct {
+	UUID  uuid.UUID
+	Term  string
+	Count int
+}
+
 // Snip represents a snippet of data with additional metadata
 type Snip struct {
 	Attachments []Attachment
@@ -70,19 +77,22 @@ func (s *Snip) GenerateName(wordCount int) string {
 func (s *Snip) Index() error {
 	// parse into valid words
 	var wordsEmbedded []string
-	/*
-		for _, w := range strings.Split(string(wordsBytes), "\n") {
-			wordsEmbedded = append(wordsEmbedded, w)
-		}
-	*/
-	wordsEmbedded = append(wordsEmbedded, strings.Split(string(wordsBytes), "\n")...)
-	wordsJoined := strings.Join(wordsEmbedded, " ")
+	var wordsStemmed []string
+	var dataStemmed []string
 
-	wordsJoinedStemmed, err := snowball.Stem(wordsJoined, "english", true)
-	if err != nil {
-		return err
+	wordsEmbedded = append(wordsEmbedded, strings.Split(string(wordsBytes), "\n")...)
+	log.Debug().Int("wordsEmbedded", len(wordsEmbedded)).Msg("word dict count")
+	log.Debug().Str("wordsEmbedded[0]", wordsEmbedded[0]).Msg("first word")
+	// FIXME - this stem dictionary should be reused so as to not do the work for every snip
+	for _, word := range wordsEmbedded {
+		stem, err := snowball.Stem(word, "english", true)
+		if err != nil {
+			return err
+		}
+		wordsStemmed = append(wordsStemmed, stem)
 	}
-	wordsStemmed := strings.Split(wordsJoinedStemmed, " ")
+	log.Debug().Int("wordsStemmed", len(wordsStemmed)).Msg("word stem count")
+	log.Debug().Str("wordsStemmed[0]", wordsStemmed[0]).Msg("first stem")
 
 	// TODO: remove stop words from dict
 
@@ -90,18 +100,19 @@ func (s *Snip) Index() error {
 	dataCleaned := strings.ReplaceAll(string(s.Data), ". ", " ")
 	dataCleaned = strings.ReplaceAll(dataCleaned, ", ", " ")
 
-	dataStemmed, err := snowball.Stem(dataCleaned, "english", true)
-	if err != nil {
-		return err
-	}
-	dataStemmedSplit := strings.Split(dataStemmed, " ")
-	if err != nil {
-		return err
+	// dataStemmed, err := snowball.Stem(dataCleaned, "english", true)
+	dataCleanedSplit := strings.Split(dataCleaned, " ")
+	for _, word := range dataCleanedSplit {
+		stem, err := snowball.Stem(word, "english", true)
+		if err != nil {
+			return err
+		}
+		dataStemmed = append(dataStemmed, stem)
 	}
 
 	// build terms and counts
 	terms := make(map[string]int, 0)
-	for _, term := range dataStemmedSplit {
+	for _, term := range dataStemmed {
 		// determine if term has already been processed
 		_, ok := terms[term]
 		if ok {
@@ -114,17 +125,19 @@ func (s *Snip) Index() error {
 		for _, wordStem := range wordsStemmed {
 			if wordStem == term {
 				valid = true
+				// log.Debug().Str("term", term).Msg("valid")
 				break
 			}
 		}
 		if !valid {
+			// log.Debug().Str("term", term).Msg("did not match dictionary")
 			continue
 		}
 
 		// count occurrences
 		count := 0
 		func() {
-			for _, t := range dataStemmedSplit {
+			for _, t := range dataStemmed {
 				if term == t {
 					count++
 				}
@@ -691,6 +704,65 @@ func SearchDataTerm(term string) ([]Snip, error) {
 	}
 
 	return searchResult, nil
+}
+
+// SearchIndexTerm searches the index and returns results matching the given term
+func SearchIndexTerm(term string, limit int) ([]SearchResult, error) {
+	var searchResults []SearchResult
+	var limitSet bool = false
+
+	if limit != 0 {
+		limitSet = true
+	}
+
+	if term == "" {
+		return searchResults, fmt.Errorf("refusing to search for empty string")
+	}
+	// stem the term
+	termStemmed, err := snowball.Stem(term, "english", true)
+	log.Debug().Str("termStemmed", termStemmed).Msg("term stemmed")
+
+	stmt, err := database.Conn.Prepare(`SELECT uuid, count FROM snip_index WHERE term = ?`, termStemmed)
+	if err != nil {
+		return searchResults, err
+	}
+	defer stmt.Close()
+
+	for {
+		hasRow, err := stmt.Step()
+		if err != nil {
+			return searchResults, err
+		}
+		if !hasRow {
+			break
+		}
+		// mind limit
+		if limitSet {
+			if len(searchResults) > limit {
+				break
+			}
+		}
+
+		var (
+			idStr string
+			count int
+		)
+		err = stmt.Scan(&idStr, &count)
+		if err != nil {
+			return searchResults, err
+		}
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return searchResults, err
+		}
+		searchResults = append(searchResults, SearchResult{
+			UUID:  id,
+			Term:  termStemmed,
+			Count: count,
+		})
+	}
+
+	return searchResults, nil
 }
 
 // SearchUUID returns a slice of Snips with uuids matching partial search term
