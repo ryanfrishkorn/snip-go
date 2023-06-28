@@ -213,6 +213,45 @@ func TestSnipCountWords(t *testing.T) {
 	}
 }
 
+func TestSnipGatherContext(t *testing.T) {
+	s, err := GetFromUUID("65f6930f-e970-4b6e-b10c-fca3dac21c1e")
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+
+	// test "ipsum" (second word in document)
+	expected := []string{
+		"Lorem ipsum dolor",
+		"vitae ipsum. Etiam",
+		"amet ipsum. Cras",
+		"quis ipsum sed",
+		"malesuada ipsum eget",
+	}
+	result := s.GatherContext("ipsum", 1)
+	if len(expected) != len(result) {
+		t.Fatalf("expected len() %d, got %d", len(expected), len(result))
+	}
+	for idx, words := range expected {
+		if strings.Compare(words, result[idx]) != 0 {
+			t.Fatalf("unmatched line, expected %s, got %s", words, result[idx])
+		}
+	}
+
+	// test Lorem (first word in document)
+	expected = []string{
+		"Lorem ipsum dolor",
+	}
+	result = s.GatherContext("Lorem", 2)
+	if len(expected) != len(result) {
+		t.Fatalf("expected len() %d, got %d", len(expected), len(result))
+	}
+	for idx, words := range expected {
+		if strings.Compare(words, result[idx]) != 0 {
+			t.Fatalf("unmatched line, expected %s, got %s", words, result[idx])
+		}
+	}
+}
+
 func TestSnipGenerateName(t *testing.T) {
 	s := New()
 	s.Data = []byte("My day   at\n the\taquarium started out")

@@ -75,6 +75,67 @@ func (s *Snip) CountWords() int {
 	return len(re.Split(data, -1))
 }
 
+// GatherContext returns the surrounding words matching the given term
+func (s *Snip) GatherContext(term string, adjacent int) []string {
+	var words []string
+
+	// locate all matches for search term
+	var (
+		patternBefore string
+		patternTerm   string
+		patternAfter  string
+	)
+
+	// patternTerm = fmt.Sprintf(`[ .,]+%s[ .,]+`, term)
+	patternTerm = fmt.Sprintf(`%s`, term)
+	// search for pattern only to determine number of occurrences
+	exactMatches := regexp.MustCompile(term).FindAllString(string(s.Data), -1)
+	// log.Debug().Int("exact matches", len(exactMatches)).Msg("total exact matches")
+
+	// spiral outward comparing the number of valid matches to
+	// occurrences to determine if context words are available
+	// possibleWord := `\w+`
+	// possibleWord := `[a-zA-Z0-9'.()\-]+`
+	// possibleWord := `([^\s]|['.()\-])+`
+	possibleWord := `[^\s]+`
+	for i := 0; i < adjacent; i++ {
+		// check for possible PRECEDING term
+		checkBefore := fmt.Sprintf("%s[ .,]? +%s%s", possibleWord, patternBefore, patternTerm)
+		checkBeforePattern := regexp.MustCompile(checkBefore)
+		checkBeforeMatches := checkBeforePattern.FindAllString(string(s.Data), -1)
+
+		// log.Debug().Str("checkBefore", checkBefore).Msg("before matches")
+		// log.Debug().Int("len(checkBeforeMatches)", len(checkBeforeMatches)).Msg("before matches")
+		if len(checkBeforeMatches) == len(exactMatches) {
+			// log.Debug().Msg("preceding word present")
+			// append to pattern to gather word
+			patternBefore = fmt.Sprintf("%s[ .,]? +%s", possibleWord, patternBefore)
+			// log.Debug().Str("patternBefore", patternBefore)
+		}
+
+		// check for possible FOLLOWING term
+		checkAfter := fmt.Sprintf("%s%s[ .,]? +%s", patternTerm, patternAfter, possibleWord)
+		checkAfterPattern := regexp.MustCompile(checkAfter)
+		checkAfterMatches := checkAfterPattern.FindAllString(string(s.Data), -1)
+		// log.Debug().Str("checkAfter", checkAfter).Msg("after matches")
+		// log.Debug().Int("len(checkAfterMatches)", len(checkAfterMatches)).Msg("after matches")
+		if len(checkAfterMatches) == len(exactMatches) {
+			// log.Debug().Msg("following word present")
+			// append to pattern to gather word
+			patternAfter = fmt.Sprintf("%s[ .,]? +%s", patternAfter, possibleWord)
+			// log.Debug().Str("patternAfter", patternAfter)
+		}
+	}
+	patternStr := fmt.Sprintf("%s%s%s", patternBefore, patternTerm, patternAfter)
+	// log.Debug().Str("patternStr", patternStr).Msg("final pattern")
+	pattern := regexp.MustCompile(patternStr)
+
+	words = pattern.FindAllString(string(s.Data), -1)
+	// log.Debug().Str("data", string(s.Data)).Msg("gathering context")
+	// log.Debug().Any("matches", words).Msg("gathering context")
+	return words
+}
+
 // GenerateName returns a clean string derived from processing the data field
 func (s *Snip) GenerateName(wordCount int) string {
 	data := FlattenString(string(s.Data))
@@ -88,7 +149,7 @@ func (s *Snip) GenerateName(wordCount int) string {
 func (s *Snip) Index() error {
 	// make sure dictionary is stemmed
 	if len(wordsStemmed) == 0 {
-		log.Debug().Msg("stemming embedded dictionary")
+		// log.Debug().Msg("stemming embedded dictionary")
 		err := StemDict()
 		if err != nil {
 			return err

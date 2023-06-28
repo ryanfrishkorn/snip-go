@@ -629,6 +629,21 @@ snip rm <uuid ...>              remove snip <uuid> ...
 					fmt.Printf("%s: %d", stat.Term, stat.Count)
 				}
 				fmt.Printf("\n")
+				// show context
+				s, err := snip.GetFromUUID(score.UUID.String())
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "There was a problem showing search context for item %s\n", score.UUID)
+					log.Debug().Err(err).Msg("building snip to obtain search context")
+					os.Exit(1)
+				}
+				for _, term := range terms {
+					words := s.GatherContext(term, 8)
+					wordsJoined := strings.Join(words, " ")
+					if len(words) > 0 {
+						fmt.Printf("  \"%s\"\n", wordsJoined)
+					}
+				}
+				fmt.Printf("\n")
 			}
 
 			if len(searchResults) <= 0 {
