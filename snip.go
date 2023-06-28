@@ -86,8 +86,8 @@ func (s *Snip) GatherContext(term string, adjacent int) []string {
 		patternAfter  string
 	)
 
-	// patternTerm = fmt.Sprintf(`[ .,]+%s[ .,]+`, term)
-	patternTerm = fmt.Sprintf(`%s`, term)
+	// patternTerm = fmt.Sprintf(`%s`, term)
+	patternTerm = fmt.Sprintf(`%s\w*`, term)
 	// search for pattern only to determine number of occurrences
 	exactMatches := regexp.MustCompile(term).FindAllString(string(s.Data), -1)
 	// log.Debug().Int("exact matches", len(exactMatches)).Msg("total exact matches")
