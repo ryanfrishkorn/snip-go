@@ -693,7 +693,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				os.Exit(1)
 			}
 			for i := 0; i < numLength; i++ {
-				fmt.Fprintf(os.Stderr, "\b")
+				fmt.Fprintf(os.Stderr, "\b \b")
 			}
 		}
 		fmt.Fprintf(os.Stderr, "success\n")

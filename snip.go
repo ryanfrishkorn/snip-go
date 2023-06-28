@@ -18,6 +18,7 @@ var (
 	//go:embed words_princeton.txt
 	f             embed.FS
 	wordsBytes, _ = f.ReadFile("words_princeton.txt")
+	wordsStemmed  []string
 )
 
 // SearchCount contains info about a search term frequency from the index
@@ -79,33 +80,22 @@ func (s *Snip) GenerateName(wordCount int) string {
 
 // Index stems all data and writes it to a search table
 func (s *Snip) Index() error {
-	// parse into valid words
-	var wordsEmbedded []string
-	var wordsStemmed []string
-	var dataStemmed []string
-
-	wordsEmbedded = append(wordsEmbedded, strings.Split(string(wordsBytes), "\n")...)
-	// log.Debug().Int("wordsEmbedded", len(wordsEmbedded)).Msg("word dict count")
-	// log.Debug().Str("wordsEmbedded[0]", wordsEmbedded[0]).Msg("first word")
-	// FIXME - this stem dictionary should be reused so as to not do the work for every snip
-	for _, word := range wordsEmbedded {
-		stem, err := snowball.Stem(word, "english", true)
+	// make sure dictionary is stemmed
+	if len(wordsStemmed) == 0 {
+		log.Debug().Msg("stemming embedded dictionary")
+		err := StemDict()
 		if err != nil {
 			return err
 		}
-		wordsStemmed = append(wordsStemmed, stem)
 	}
-	// log.Debug().Int("wordsStemmed", len(wordsStemmed)).Msg("word stem count")
-	// log.Debug().Str("wordsStemmed[0]", wordsStemmed[0]).Msg("first stem")
-
 	// TODO: remove stop words from dict
 
 	// remove commas and periods
 	dataCleaned := strings.ReplaceAll(string(s.Data), ". ", " ")
 	dataCleaned = strings.ReplaceAll(dataCleaned, ", ", " ")
 
-	// dataStemmed, err := snowball.Stem(dataCleaned, "english", true)
 	dataCleanedSplit := strings.Split(dataCleaned, " ")
+	var dataStemmed []string
 	for _, word := range dataCleanedSplit {
 		stem, err := snowball.Stem(word, "english", true)
 		if err != nil {
@@ -858,6 +848,24 @@ func SearchUUID(term string) ([]Snip, error) {
 		searchResult = append(searchResult, s)
 	}
 	return searchResult, nil
+}
+
+// StemDict builds a global string array of stemmed terms from the embedded dictionary
+func StemDict() error {
+	wordsEmbedded := strings.Split(string(wordsBytes), "\n")
+	// log.Debug().Int("wordsEmbedded", len(wordsEmbedded)).Msg("word dict count")
+	// log.Debug().Str("wordsEmbedded[0]", wordsEmbedded[0]).Msg("first word")
+	// FIXME - this stem dictionary should be reused so as to not do the work for every snip
+	for _, word := range wordsEmbedded {
+		stem, err := snowball.Stem(word, "english", true)
+		if err != nil {
+			return err
+		}
+		wordsStemmed = append(wordsStemmed, stem)
+	}
+	// log.Debug().Int("wordsStemmed", len(wordsStemmed)).Msg("word stem count")
+	// log.Debug().Str("wordsStemmed[0]", wordsStemmed[0]).Msg("first stem")
+	return nil
 }
 
 // WriteAttachment writes the attached file to the current working directory
