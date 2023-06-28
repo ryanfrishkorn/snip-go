@@ -32,6 +32,12 @@ type SearchResult struct {
 	Terms []SearchCount
 }
 
+type SearchScore struct {
+	UUID         uuid.UUID
+	Score        float64
+	SearchCounts []SearchCount
+}
+
 // Snip represents a snippet of data with additional metadata
 type Snip struct {
 	Attachments []Attachment

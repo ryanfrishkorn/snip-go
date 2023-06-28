@@ -62,7 +62,8 @@ snip get <uuid>                 retrieve snip with specified uuid
 
 snip ls                         list all snips
 
-snip search <term>              return snips whose data contains given term
+snip search <term ...>          return snips whose data contains given term
+       -type <data|index>       specify search source (data uses a singular term only)
        -f <field>               search snip field
 
 snip rename <uuid> <new_name>   rename snip
@@ -599,8 +600,11 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			}
 
 			// heading goes to stdout for piping convenience
-			fmt.Fprintf(os.Stderr, "%s %37s %9s\n", "uuid", "score", "counts")
-			// TODO sort this output
+			if len(searchResults) > 0 {
+				fmt.Fprintf(os.Stderr, "%s %37s %9s\n", "uuid", "score", "counts")
+			}
+
+			var scores []snip.SearchScore
 			for key, result := range searchResults {
 				score, err := snip.ScoreCounts(key, terms, result)
 				if err != nil {
@@ -608,8 +612,17 @@ snip rm <uuid ...>              remove snip <uuid> ...
 					log.Debug().Err(err).Str("uuid", key.String()).Msg("scoring the results")
 					os.Exit(1)
 				}
-				fmt.Printf("%s %f ", key.String(), score)
-				for idx, stat := range result {
+				// add to sortable slice
+				scores = append(scores, snip.SearchScore{UUID: key, Score: score, SearchCounts: result})
+			}
+
+			// sorted output by highest score
+			sort.Slice(scores, func(i int, j int) bool {
+				return scores[i].Score > scores[j].Score
+			})
+			for _, score := range scores {
+				fmt.Printf("%s %f ", score.UUID, score.Score)
+				for idx, stat := range score.SearchCounts {
 					if idx != 0 {
 						fmt.Printf(", ")
 					}
