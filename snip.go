@@ -273,6 +273,36 @@ func CreateNewDatabase() error {
 	return nil
 }
 
+// CumulativeTermsCount returns a total of all occurrences of all known terms in a document's search index
+func CumulativeTermsCount(id uuid.UUID) (int, error) {
+	var count int
+
+	stmt, err := database.Conn.Prepare(`SELECT sum(count) from snip_index where uuid = ?`)
+	if err != nil {
+		return count, err
+	}
+	err = stmt.Exec(id.String())
+	if err != nil {
+		return count, err
+	}
+	defer stmt.Close()
+
+	hasRow, err := stmt.Step()
+	if err != nil {
+		return count, err
+	}
+	if !hasRow {
+		return count, fmt.Errorf("cumulative count returned zero rows on a sum() operation")
+	}
+
+	err = stmt.Scan(&count)
+	if err != nil {
+		return count, err
+	}
+
+	return count, nil
+}
+
 // Delete removes a snip from the database
 func Delete(id uuid.UUID) error {
 	// remove associated attachments
@@ -665,6 +695,28 @@ func New() Snip {
 		Name:      "",
 		UUID:      uuid.New(),
 	}
+}
+
+// ScoreCounts returns a floating point score for search result validity
+func ScoreCounts(id uuid.UUID, terms []string, counts []SearchCount) (float64, error) {
+	var matchTermsRatio float64
+	var matchProminence float64
+	// calculate the ratio of matching terms to search terms
+	matchTermsRatio = float64(len(counts)) / float64(len(terms))
+
+	// calculate the ratio representing the prominence of the search term is within the document itself
+	// add all the counts for all terms in the index matching this uuid
+	indexedTerms, err := CumulativeTermsCount(id)
+	if err != nil {
+		return 0, err
+	}
+	if indexedTerms != 0 {
+		matchProminence = float64(len(terms)) / float64(indexedTerms)
+	}
+	log.Debug().Float64("matchTermsRatio", matchTermsRatio).Msg("scoring")
+	log.Debug().Float64("matchProminence", matchProminence).Msg("scoring")
+
+	return (matchTermsRatio + matchProminence) / 2.0, nil
 }
 
 // SearchDataTerm returns a slice of Snips whose data matches supplied terms

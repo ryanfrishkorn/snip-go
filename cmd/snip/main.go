@@ -597,8 +597,17 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				os.Exit(1)
 			}
 
+			// heading goes to stdout for piping convenience
+			fmt.Fprintf(os.Stderr, "%s %37s %9s\n", "uuid", "score", "counts")
+			// TODO sort this output
 			for key, result := range searchResults {
-				fmt.Printf("%s - ", key.String())
+				score, err := snip.ScoreCounts(key, terms, result)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "There was a problem scoring the item with id %s\n", key)
+					log.Debug().Err(err).Str("uuid", key.String()).Msg("scoring the results")
+					os.Exit(1)
+				}
+				fmt.Printf("%s %f ", key.String(), score)
 				for idx, stat := range result {
 					if idx != 0 {
 						fmt.Printf(", ")
@@ -641,8 +650,9 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				fmt.Fprintf(os.Stderr, "No results for term \"%s\"\n", term)
 				os.Exit(0)
 			}
-			for idx, s := range snipResults {
-				fmt.Printf("%d uuid: %s name: %s\n", idx+1, s.UUID.String(), s.Name)
+			fmt.Fprintf(os.Stderr, "%s %36s\n", "uuid", "name")
+			for _, s := range snipResults {
+				fmt.Printf("%s %s\n", s.UUID.String(), s.Name)
 			}
 		}
 
