@@ -577,37 +577,45 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			searchCmd.Usage()
 			os.Exit(1)
 		}
-
-		term := searchCmd.Args()[0]
+		if len(searchCmd.Args()) < 1 {
+			fmt.Fprintf(os.Stderr, "Must supply at least one search term.\n")
+			searchCmd.Usage()
+			os.Exit(1)
+		}
 
 		var snipResults []snip.Snip
-		var searchResults []snip.SearchResult
+
 		switch *searchCmdType {
 		case "index":
-			fmt.Fprintf(os.Stderr, "Search type %s for: \"%s\"\n", *searchCmdType, term)
-			searchResults, err = snip.SearchIndexTerm(term, 0)
+			terms := searchCmd.Args()
+
+			fmt.Fprintf(os.Stderr, "Search type %s for: %s\n", *searchCmdType, strings.Join(terms, ", "))
+			searchResults, err := snip.SearchIndexTerm(terms, 0)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "There was a problem searching the index for term %s\n", term)
+				fmt.Fprintf(os.Stderr, "There was a problem searching the index for term %s\n", terms)
 				log.Debug().Err(err).Msg("error while searching for term")
 				os.Exit(1)
 			}
-			// fmt.Printf("%v\n", searchResults)
-			for idx, result := range searchResults {
-				// obtain full snip for more data
-				s, err := snip.GetFromUUID(result.UUID.String())
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "There was a problem retrieving metadata for snip %s.\n", result.UUID.String())
-					log.Debug().Err(err).Msg("retrieving snip via uuid")
-					os.Exit(1)
+
+			for key, result := range searchResults {
+				fmt.Printf("%s - ", key.String())
+				for idx, stat := range result {
+					if idx != 0 {
+						fmt.Printf(", ")
+					}
+					fmt.Printf("%s: %d", stat.Term, stat.Count)
 				}
-				fmt.Printf("%d - %s %d %s\n", idx+1, s.UUID.String(), result.Count, s.Name)
+				fmt.Printf("\n")
 			}
+
 			if len(searchResults) <= 0 {
-				fmt.Fprintf(os.Stderr, "No results for term \"%s\"\n", term)
+				fmt.Fprintf(os.Stderr, "No results for term \"%s\"\n", terms)
 				os.Exit(0)
 			}
 
 		case "data":
+			term := searchCmd.Args()[0]
+
 			fmt.Fprintf(os.Stderr, "Search type %s on field %s for: \"%s\"\n", *searchCmdType, *searchCmdField, term)
 			log.Debug().Str("field", *searchCmdField)
 

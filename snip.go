@@ -20,11 +20,15 @@ var (
 	wordsBytes, _ = f.ReadFile("words_princeton.txt")
 )
 
-// SearchResult contains info about a search term frequency from the index
-type SearchResult struct {
-	UUID  uuid.UUID
+// SearchCount contains info about a search term frequency from the index
+type SearchCount struct {
 	Term  string
 	Count int
+}
+
+type SearchResult struct {
+	UUID  uuid.UUID
+	Terms []SearchCount
 }
 
 // Snip represents a snippet of data with additional metadata
@@ -705,59 +709,62 @@ func SearchDataTerm(term string) ([]Snip, error) {
 }
 
 // SearchIndexTerm searches the index and returns results matching the given term
-func SearchIndexTerm(term string, limit int) ([]SearchResult, error) {
-	var searchResults []SearchResult
+func SearchIndexTerm(terms []string, limit int) (map[uuid.UUID][]SearchCount, error) {
+	var searchResults = make(map[uuid.UUID][]SearchCount, 0)
 	var limitSet bool = false
 
 	if limit != 0 {
 		limitSet = true
 	}
 
-	if term == "" {
+	if len(terms) <= 0 {
 		return searchResults, fmt.Errorf("refusing to search for empty string")
 	}
-	// stem the term
-	termStemmed, err := snowball.Stem(term, "english", true)
-	log.Debug().Str("termStemmed", termStemmed).Msg("term stemmed")
 
-	stmt, err := database.Conn.Prepare(`SELECT uuid, count FROM snip_index WHERE term = ?`, termStemmed)
-	if err != nil {
-		return searchResults, err
-	}
-	defer stmt.Close()
+	for _, term := range terms {
+		// stem the term
+		termStemmed, err := snowball.Stem(term, "english", true)
+		log.Debug().Str("termStemmed", termStemmed).Msg("term stemmed")
 
-	for {
-		hasRow, err := stmt.Step()
+		stmt, err := database.Conn.Prepare(`SELECT uuid, count FROM snip_index WHERE term = ?`, termStemmed)
 		if err != nil {
 			return searchResults, err
 		}
-		if !hasRow {
-			break
-		}
-		// mind limit
-		if limitSet {
-			if len(searchResults) > limit {
+		defer stmt.Close()
+
+		for {
+			hasRow, err := stmt.Step()
+			if err != nil {
+				return searchResults, err
+			}
+			if !hasRow {
 				break
 			}
-		}
+			// mind limit
+			if limitSet {
+				if len(searchResults) > limit {
+					break
+				}
+			}
 
-		var (
-			idStr string
-			count int
-		)
-		err = stmt.Scan(&idStr, &count)
-		if err != nil {
-			return searchResults, err
+			var (
+				idStr string
+				count int
+			)
+			err = stmt.Scan(&idStr, &count)
+			if err != nil {
+				return searchResults, err
+			}
+			id, err := uuid.Parse(idStr)
+			if err != nil {
+				return searchResults, err
+			}
+			result := SearchCount{
+				Term:  term,
+				Count: count,
+			}
+			searchResults[id] = append(searchResults[id], result)
 		}
-		id, err := uuid.Parse(idStr)
-		if err != nil {
-			return searchResults, err
-		}
-		searchResults = append(searchResults, SearchResult{
-			UUID:  id,
-			Term:  termStemmed,
-			Count: count,
-		})
 	}
 
 	return searchResults, nil
