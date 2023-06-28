@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -674,7 +675,12 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			fmt.Fprintf(os.Stderr, "error")
 			os.Exit(1)
 		}
-		for _, id := range ids {
+		numLength := 0
+		for idx, id := range ids {
+			// assign for next time
+			numLength = len(strconv.Itoa(idx+1)) + 1 + len(strconv.Itoa(len(ids)))
+			progressStr := fmt.Sprintf("%d/%d", idx+1, len(ids))
+			fmt.Fprintf(os.Stderr, progressStr)
 			s, err := snip.GetFromUUID(id.String())
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error")
@@ -685,6 +691,9 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error indexing item %s\n", s.UUID)
 				os.Exit(1)
+			}
+			for i := 0; i < numLength; i++ {
+				fmt.Fprintf(os.Stderr, "\b")
 			}
 		}
 		fmt.Fprintf(os.Stderr, "success\n")
