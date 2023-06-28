@@ -90,9 +90,13 @@ func (s *Snip) Index() error {
 	}
 	// TODO: remove stop words from dict
 
+	// replace newlines with spaces for splitting
+	dataCleaned := strings.ReplaceAll(string(s.Data), "\n", " ")
 	// remove commas and periods
-	dataCleaned := strings.ReplaceAll(string(s.Data), ". ", " ")
+	dataCleaned = strings.ReplaceAll(dataCleaned, ". ", " ")
 	dataCleaned = strings.ReplaceAll(dataCleaned, ", ", " ")
+	// remove period typical on last sentence
+	dataCleaned = strings.TrimSuffix(dataCleaned, ".")
 
 	dataCleanedSplit := strings.Split(dataCleaned, " ")
 	var dataStemmed []string
