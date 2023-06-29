@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/bvinc/go-sqlite-lite/sqlite3"
+	"github.com/fatih/color"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -645,7 +646,10 @@ snip rm <uuid ...>              remove snip <uuid> ...
 					for _, ctx := range ctxAll {
 						before := strings.Join(ctx.Before, " ")
 						after := strings.Join(ctx.After, " ")
-						fmt.Printf("    \"%s [%s] %s\"\n", before, ctx.Term, after)
+						fmt.Printf("    \"%s ", before)
+						c := color.New(color.FgRed)
+						c.Printf("%s", ctx.Term)
+						fmt.Printf(" %s\"\n", after)
 					}
 				}
 				fmt.Printf("\n")
