@@ -617,16 +617,28 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				return scores[i].Score > scores[j].Score
 			})
 			for _, score := range scores {
-				fmt.Printf("%s %f ", score.UUID, score.Score)
+				// get full snip to display name
+				s, err := snip.GetFromUUID(score.UUID.String())
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "There was a problem getting the snip to display its name.\n")
+					log.Debug().Err(err).Msg("building snip to display name")
+					os.Exit(1)
+				}
+				fmt.Printf("%s (score: %f)\n", s.UUID, score.Score)
+				fmt.Printf("%s", s.Name)
 				for idx, stat := range score.SearchCounts {
-					if idx != 0 {
+					if idx == 0 {
+						fmt.Printf(" [")
+					} else {
 						fmt.Printf(", ")
 					}
 					fmt.Printf("%s: %d", stat.Term, stat.Count)
+					if idx == len(score.SearchCounts)-1 {
+						fmt.Printf("]\n")
+					}
 				}
-				fmt.Printf("\n")
 				// show context
-				s, err := snip.GetFromUUID(score.UUID.String())
+				s, err = snip.GetFromUUID(score.UUID.String())
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "There was a problem showing search context for item %s\n", score.UUID)
 					log.Debug().Err(err).Msg("building snip to obtain search context")
@@ -635,11 +647,19 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				for _, term := range terms {
 					ctxAll, err := s.GatherContext(term, 6)
 					if err != nil {
-						fmt.Fprintf(os.Stderr, "There was a problem gathering context for term %s: %v\n", term, err)
-						log.Debug().Str("term", term).Str("uuid", score.UUID.String()).Msg("gathering context")
-						log.Debug().Err(err).Msg("gathering context")
-						os.Exit(1)
+						// FIXME - in this case, there are no results (which is technically not an error)
+						// there should be a different way to distinguish success from actual error
+						// Perhaps only matching terms should be iterated over instead of supplied terms
+						continue
 					}
+					/*
+						if err != nil {
+							fmt.Fprintf(os.Stderr, "There was a problem gathering context for term %s: %v\n", term, err)
+							log.Debug().Str("term", term).Str("uuid", score.UUID.String()).Msg("gathering context")
+							log.Debug().Err(err).Msg("gathering context")
+							os.Exit(1)
+						}
+					*/
 					// log.Debug().Any("ctx", ctxAll).Msg("term context")
 
 					// print each context
