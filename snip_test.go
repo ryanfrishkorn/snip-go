@@ -316,3 +316,46 @@ func TestSnipIndex(t *testing.T) {
 		}
 	}
 }
+
+func TestSplitWords(t *testing.T) {
+	text := `
+This is (simple) test data. Let's keep it simple, for the time being.
+This is the second line.
+`
+	expect := []string{
+		"this",
+		"is",
+		"simple",
+		"test",
+		"data",
+		"let's",
+		"keep",
+		"it",
+		"simple",
+		"for",
+		"the",
+		"time",
+		"being",
+		"this",
+		"is",
+		"the",
+		"second",
+		"line",
+	}
+	textSplit := SplitWords(text)
+	// t.Logf("expect: %v, %d", expect, len(expect))
+	// t.Logf("   got: %v, %d", textSplit, len(textSplit))
+
+	validate := func(a []string, b []string) bool {
+		for idx, _ := range a {
+			if strings.Compare(a[idx], b[idx]) != 0 {
+				t.Errorf(`"%s" != "%s"`, a[idx], b[idx])
+				return false
+			}
+		}
+		return true
+	}
+	if !validate(expect, textSplit) {
+		t.Errorf("word slices failed comparison, \nexpected: %v\n      got %v", expect, textSplit)
+	}
+}

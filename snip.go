@@ -145,6 +145,52 @@ func (s *Snip) GenerateName(wordCount int) string {
 	return strings.Join(name, " ")
 }
 
+// SplitWords returns a slice of strings, one word per element
+func SplitWords(text string) []string {
+	// split by whitespace
+	pattern := regexp.MustCompile(`(?s)\s+`)
+	words := pattern.Split(text, -1)
+	words = words[1 : len(words)-1] // remove first and last empty strings
+	words = StripPunctuation(words)
+	words = DownCase(words)
+
+	return words
+}
+
+// StripPunctuation strips all commas, periods, etc from a slice of strings
+func StripPunctuation(words []string) []string {
+	var patterns []regexp.Regexp
+	var expressions = []string{
+		// period, comma start and end
+		`^[.,]+`,
+		`[.,]+$`,
+		// parentheses
+		`^[\(\)]+`,
+		`[\(\)]+$`,
+	}
+	// compile and aggregate
+	for _, p := range expressions {
+		patterns = append(patterns, *regexp.MustCompile(p))
+	}
+
+	for _, pattern := range patterns {
+		// log.Debug().Str("pattern", pattern.String()).Msg("pattern")
+		for idx, word := range words {
+			words[idx] = pattern.ReplaceAllString(word, "")
+		}
+	}
+	return words
+}
+
+// DownCase returns a slice of strings that have been cased down
+func DownCase(words []string) []string {
+	var output []string
+	for _, w := range words {
+		output = append(output, strings.ToLower(w))
+	}
+	return output
+}
+
 // Index stems all data and writes it to a search table
 func (s *Snip) Index() error {
 	// make sure dictionary is stemmed
