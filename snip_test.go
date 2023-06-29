@@ -279,29 +279,27 @@ func TestSnipIndex(t *testing.T) {
 }
 
 func TestSplitWords(t *testing.T) {
-	text := `
-This is (simple) test data. Let's keep it simple, for the time being.
-This is the second line.
-`
+	text := `This is simple test data. Let's keep it simple, for the time being.
+This is the second line.`
 	expect := []string{
 		"This",
 		"is",
 		"simple",
 		"test",
-		"data",
+		"data.",
 		"Let's",
 		"keep",
 		"it",
-		"simple",
+		"simple,",
 		"for",
 		"the",
 		"time",
-		"being",
+		"being.",
 		"This",
 		"is",
 		"the",
 		"second",
-		"line",
+		"line.",
 	}
 	textSplit := SplitWords(text)
 	// t.Logf("expect: %v, %d", expect, len(expect))

@@ -98,8 +98,17 @@ func (s *Snip) GatherContext(term string, adjacent int) ([]TermContext, error) {
 		return ctxAll, err
 	}
 	positionsSplit := strings.Split(positions, ",")
+	if len(positionsSplit) == 0 {
+		return ctxAll, fmt.Errorf("splitting positions producted zero elements")
+	}
+	log.Debug().Any("positionsSplit", positionsSplit).Msg("splitting positions")
+
 	var positionsSplitInt []int
-	for _, p := range positionsSplit {
+	for idx, p := range positionsSplit {
+		// disregard empty string
+		if p == "" && idx == (len(positionsSplit)-1) {
+			break
+		}
 		i, err := strconv.Atoi(p)
 		if err != nil {
 			return ctxAll, err
@@ -124,34 +133,32 @@ func (s *Snip) GatherContext(term string, adjacent int) ([]TermContext, error) {
 		var ctx TermContext
 		// establish either the amount of terms requested (adjacent) or the maximum we can satisfy
 		// attempt to find words before term
-		numBefore := adjacent
 		start := position - adjacent
-		// numAfter := adjacent
-		// diff := position - adjacent
 		if start < 0 {
 			// numBefore = adjacent - (-diff) // absolute value of diff here
 			start = 0
 		}
-		log.Debug().Int("numBefore", numBefore).Msg("number")
-		log.Debug().Int("position", position).Msg("GatherContextNew")
+		// log.Debug().Int("start", start).Msg("number")
+		// log.Debug().Int("position", position).Msg("GatherContextNew")
 		for i := start; i < position; i++ {
+			// log.Debug().Msg("ITERATION")
 			ctx.Before = append(ctx.Before, words[i])
-			log.Debug().Str("words[i]", words[i]).Msg("added word to before")
+			// log.Debug().Str("words[i]", words[i]).Msg("added word to before")
 		}
-		log.Debug().Int("len(ctx.Before)", len(ctx.Before)).Msg("before terms count")
+		// log.Debug().Int("len(ctx.Before)", len(ctx.Before)).Msg("before terms count")
 
 		// assign term from data source, not supplied search term
 		ctx.Term = words[position]
 
 		// attempt to find words after term
-		last := position + adjacent
-		if last > len(words) {
-			last = len(words) - 1
+		lastElement := position + adjacent
+		if lastElement >= len(words)-1 {
+			lastElement = len(words) - 1
 		}
-		for i := position + 1; i <= last; i++ {
-			log.Debug().Int("i", i).Msg("counter")
+		for i := position + 1; i <= lastElement; i++ {
+			// log.Debug().Int("i", i).Msg("counter")
 			ctx.After = append(ctx.After, words[i])
-			log.Debug().Str("words[i]", words[i]).Msg("added word to after")
+			// log.Debug().Str("words[i]", words[i]).Msg("added word to after")
 		}
 		log.Debug().Int("len(ctx.After)", len(ctx.After)).Msg("after terms count")
 		ctxAll = append(ctxAll, ctx)
@@ -174,12 +181,6 @@ func SplitWords(text string) []string {
 	// split by whitespace
 	pattern := regexp.MustCompile(`(?s)\s+`)
 	words := pattern.Split(text, -1)
-	// log.Debug().Int("len(words)", len(words)).Msg("banana")
-	// remove first and last empty strings if present
-	if len(words) > 2 {
-		words = words[1 : len(words)-1]
-	}
-	words = StripPunctuation(words)
 
 	return words
 }
@@ -328,7 +329,8 @@ func (s *Snip) GetPositions(term string) (string, error) {
 		return positions, err
 	}
 	if !hasRow {
-		return positions, fmt.Errorf("no rows returned while getting positions")
+		// zero results is not an error, caller should check results in addition to error
+		return positions, nil
 	}
 	err = stmt.Scan(&positions)
 	if err != nil {

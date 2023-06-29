@@ -647,19 +647,17 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				for _, term := range terms {
 					ctxAll, err := s.GatherContext(term, 6)
 					if err != nil {
-						// FIXME - in this case, there are no results (which is technically not an error)
-						// there should be a different way to distinguish success from actual error
-						// Perhaps only matching terms should be iterated over instead of supplied terms
+						fmt.Fprintf(os.Stderr, "There was a problem gathering context for term %s: %v\n", term, err)
+						log.Debug().Str("term", term).Str("uuid", score.UUID.String()).Msg("gathering context")
+						log.Debug().Err(err).Msg("gathering context")
+						os.Exit(1)
+					}
+					if len(ctxAll) == 0 {
+						// in this case, there are no results (which is technically not an error)
+						// TODO: perhaps only matching terms should be iterated over instead of supplied terms
 						continue
 					}
-					/*
-						if err != nil {
-							fmt.Fprintf(os.Stderr, "There was a problem gathering context for term %s: %v\n", term, err)
-							log.Debug().Str("term", term).Str("uuid", score.UUID.String()).Msg("gathering context")
-							log.Debug().Err(err).Msg("gathering context")
-							os.Exit(1)
-						}
-					*/
+
 					// log.Debug().Any("ctx", ctxAll).Msg("term context")
 
 					// print each context
@@ -668,7 +666,12 @@ snip rm <uuid ...>              remove snip <uuid> ...
 						after := strings.Join(ctx.After, " ")
 						fmt.Printf("    \"%s ", before)
 						c := color.New(color.FgRed)
-						c.Printf("%s", ctx.Term)
+						_, err = c.Printf("%s", ctx.Term)
+						if err != nil {
+							fmt.Fprintf(os.Stderr, "Color output could not be displayed.\n")
+							log.Debug().Err(err).Msg("color print of context term")
+							os.Exit(1)
+						}
 						fmt.Printf(" %s\"\n", after)
 					}
 				}
