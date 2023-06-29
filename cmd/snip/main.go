@@ -591,17 +591,12 @@ snip rm <uuid ...>              remove snip <uuid> ...
 		case "index":
 			terms := searchCmd.Args()
 
-			fmt.Fprintf(os.Stderr, "Search type %s for: %s\n", *searchCmdType, strings.Join(terms, ", "))
+			// fmt.Fprintf(os.Stderr, "Search type %s for: %s\n", *searchCmdType, strings.Join(terms, ", "))
 			searchResults, err := snip.SearchIndexTerm(terms, 0)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "There was a problem searching the index for term %s\n", terms)
 				log.Debug().Err(err).Msg("error while searching for term")
 				os.Exit(1)
-			}
-
-			// heading goes to stdout for piping convenience
-			if len(searchResults) > 0 {
-				fmt.Fprintf(os.Stderr, "%s %37s %9s\n", "uuid", "score", "counts")
 			}
 
 			var scores []snip.SearchScore
@@ -637,10 +632,20 @@ snip rm <uuid ...>              remove snip <uuid> ...
 					os.Exit(1)
 				}
 				for _, term := range terms {
-					words := s.GatherContext(term, 8)
-					wordsJoined := strings.Join(words, " ")
-					if len(words) > 0 {
-						fmt.Printf("  \"%s\"\n", wordsJoined)
+					ctxAll, err := s.GatherContext(term, 6)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "There was a problem gathering context for term %s: %v\n", term, err)
+						log.Debug().Str("term", term).Str("uuid", score.UUID.String()).Msg("gathering context")
+						log.Debug().Err(err).Msg("gathering context")
+						os.Exit(1)
+					}
+					// log.Debug().Any("ctx", ctxAll).Msg("term context")
+
+					// print each context
+					for _, ctx := range ctxAll {
+						before := strings.Join(ctx.Before, " ")
+						after := strings.Join(ctx.After, " ")
+						fmt.Printf("    \"%s [%s] %s\"\n", before, ctx.Term, after)
 					}
 				}
 				fmt.Printf("\n")

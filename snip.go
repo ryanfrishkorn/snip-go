@@ -10,6 +10,7 @@ import (
 	"github.com/ryanfrishkorn/snip/database"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -36,6 +37,12 @@ type SearchScore struct {
 	UUID         uuid.UUID
 	Score        float64
 	SearchCounts []SearchCount
+}
+
+type TermContext struct {
+	Before []string
+	Term   string
+	After  []string
 }
 
 // Snip represents a snippet of data with additional metadata
@@ -76,64 +83,81 @@ func (s *Snip) CountWords() int {
 }
 
 // GatherContext returns the surrounding words matching the given term
-func (s *Snip) GatherContext(term string, adjacent int) []string {
-	var words []string
-
-	// locate all matches for search term
+func (s *Snip) GatherContext(term string, adjacent int) ([]TermContext, error) {
 	var (
-		patternBefore string
-		patternTerm   string
-		patternAfter  string
+		ctxAll []TermContext
+		words  []string
+		stems  []string
 	)
-
-	// patternTerm = fmt.Sprintf(`%s`, term)
-	patternTerm = fmt.Sprintf(`%s\w*`, term)
-	// search for pattern only to determine number of occurrences
-	exactMatches := regexp.MustCompile(term).FindAllString(string(s.Data), -1)
-	// log.Debug().Int("exact matches", len(exactMatches)).Msg("total exact matches")
-
-	// spiral outward comparing the number of valid matches to
-	// occurrences to determine if context words are available
-	// possibleWord := `\w+`
-	// possibleWord := `[a-zA-Z0-9'.()\-]+`
-	// possibleWord := `([^\s]|['.()\-])+`
-	possibleWord := `[^\s]+`
-	for i := 0; i < adjacent; i++ {
-		// check for possible PRECEDING term
-		checkBefore := fmt.Sprintf("%s[ .,]? +%s%s", possibleWord, patternBefore, patternTerm)
-		checkBeforePattern := regexp.MustCompile(checkBefore)
-		checkBeforeMatches := checkBeforePattern.FindAllString(string(s.Data), -1)
-
-		// log.Debug().Str("checkBefore", checkBefore).Msg("before matches")
-		// log.Debug().Int("len(checkBeforeMatches)", len(checkBeforeMatches)).Msg("before matches")
-		if len(checkBeforeMatches) == len(exactMatches) {
-			// log.Debug().Msg("preceding word present")
-			// append to pattern to gather word
-			patternBefore = fmt.Sprintf("%s[ .,]? +%s", possibleWord, patternBefore)
-			// log.Debug().Str("patternBefore", patternBefore)
-		}
-
-		// check for possible FOLLOWING term
-		checkAfter := fmt.Sprintf("%s%s[ .,]? +%s", patternTerm, patternAfter, possibleWord)
-		checkAfterPattern := regexp.MustCompile(checkAfter)
-		checkAfterMatches := checkAfterPattern.FindAllString(string(s.Data), -1)
-		// log.Debug().Str("checkAfter", checkAfter).Msg("after matches")
-		// log.Debug().Int("len(checkAfterMatches)", len(checkAfterMatches)).Msg("after matches")
-		if len(checkAfterMatches) == len(exactMatches) {
-			// log.Debug().Msg("following word present")
-			// append to pattern to gather word
-			patternAfter = fmt.Sprintf("%s[ .,]? +%s", patternAfter, possibleWord)
-			// log.Debug().Str("patternAfter", patternAfter)
-		}
+	termStemmed, err := snowball.Stem(term, "english", true)
+	if err != nil {
+		return ctxAll, err
 	}
-	patternStr := fmt.Sprintf("%s%s%s", patternBefore, patternTerm, patternAfter)
-	// log.Debug().Str("patternStr", patternStr).Msg("final pattern")
-	pattern := regexp.MustCompile(patternStr)
+	positions, err := s.GetPositions(termStemmed)
+	if err != nil {
+		return ctxAll, err
+	}
+	positionsSplit := strings.Split(positions, ",")
+	var positionsSplitInt []int
+	for _, p := range positionsSplit {
+		i, err := strconv.Atoi(p)
+		if err != nil {
+			return ctxAll, err
+		}
+		positionsSplitInt = append(positionsSplitInt, i)
+	}
+	log.Debug().Any("positions", positionsSplitInt).Msg("positions")
 
-	words = pattern.FindAllString(string(s.Data), -1)
-	// log.Debug().Str("data", string(s.Data)).Msg("gathering context")
-	// log.Debug().Any("matches", words).Msg("gathering context")
-	return words
+	// build split words and corresponding stems
+	words = SplitWords(string(s.Data))
+	for _, word := range words {
+		// use DownCase here so we preserve the case of the document words
+		stem, err := snowball.Stem(word, "english", true)
+		if err != nil {
+			return ctxAll, err
+		}
+		stems = append(stems, stem)
+	}
+
+	// iterate through all positions
+	for _, position := range positionsSplitInt {
+		var ctx TermContext
+		// establish either the amount of terms requested (adjacent) or the maximum we can satisfy
+		// attempt to find words before term
+		numBefore := adjacent
+		start := position - adjacent
+		// numAfter := adjacent
+		// diff := position - adjacent
+		if start < 0 {
+			// numBefore = adjacent - (-diff) // absolute value of diff here
+			start = 0
+		}
+		log.Debug().Int("numBefore", numBefore).Msg("number")
+		log.Debug().Int("position", position).Msg("GatherContextNew")
+		for i := start; i < position; i++ {
+			ctx.Before = append(ctx.Before, words[i])
+			log.Debug().Str("words[i]", words[i]).Msg("added word to before")
+		}
+		log.Debug().Int("len(ctx.Before)", len(ctx.Before)).Msg("before terms count")
+
+		// assign term from data source, not supplied search term
+		ctx.Term = words[position]
+
+		// attempt to find words after term
+		last := position + adjacent
+		if last > len(words) {
+			last = len(words) - 1
+		}
+		for i := position + 1; i <= last; i++ {
+			log.Debug().Int("i", i).Msg("counter")
+			ctx.After = append(ctx.After, words[i])
+			log.Debug().Str("words[i]", words[i]).Msg("added word to after")
+		}
+		log.Debug().Int("len(ctx.After)", len(ctx.After)).Msg("after terms count")
+		ctxAll = append(ctxAll, ctx)
+	}
+
+	return ctxAll, nil
 }
 
 // GenerateName returns a clean string derived from processing the data field
@@ -150,20 +174,23 @@ func SplitWords(text string) []string {
 	// split by whitespace
 	pattern := regexp.MustCompile(`(?s)\s+`)
 	words := pattern.Split(text, -1)
-	words = words[1 : len(words)-1] // remove first and last empty strings
+	// log.Debug().Int("len(words)", len(words)).Msg("banana")
+	// remove first and last empty strings if present
+	if len(words) > 2 {
+		words = words[1 : len(words)-1]
+	}
 	words = StripPunctuation(words)
-	words = DownCase(words)
 
 	return words
 }
 
-// StripPunctuation strips all commas, periods, etc from a slice of strings
+// StripPunctuation strips all commas, periods, etc. from a slice of strings
 func StripPunctuation(words []string) []string {
 	var patterns []regexp.Regexp
 	var expressions = []string{
-		// period, comma start and end
-		`^[.,]+`,
-		`[.,]+$`,
+		// period, comma, etc... (start and end)
+		`^[.,!?]+`,
+		`[.,!?]+$`,
 		// parentheses
 		`^[\(\)]+`,
 		`[\(\)]+$`,
@@ -203,26 +230,24 @@ func (s *Snip) Index() error {
 	}
 	// TODO: remove stop words from dict
 
-	// replace newlines with spaces for splitting
-	dataCleaned := strings.ReplaceAll(string(s.Data), "\n", " ")
-	// remove commas and periods
-	dataCleaned = strings.ReplaceAll(dataCleaned, ". ", " ")
-	dataCleaned = strings.ReplaceAll(dataCleaned, ", ", " ")
-	// remove period typical on last sentence
-	dataCleaned = strings.TrimSuffix(dataCleaned, ".")
-
-	dataCleanedSplit := strings.Split(dataCleaned, " ")
+	var dataCleaned = SplitWords(string(s.Data))
+	dataCleaned = DownCase(dataCleaned)
 	var dataStemmed []string
-	for _, word := range dataCleanedSplit {
+	for _, word := range dataCleaned {
 		stem, err := snowball.Stem(word, "english", true)
 		if err != nil {
 			return err
 		}
 		dataStemmed = append(dataStemmed, stem)
 	}
+	// confirm equal length of split words and stemmed words
+	if len(dataCleaned) != len(dataStemmed) {
+		return fmt.Errorf("expected len(dataCleaned) %d to equal len(dataStemmed) %d", len(dataCleaned), len(dataStemmed))
+	}
 
 	// build terms and counts
 	terms := make(map[string]int, 0)
+	termsPositions := make(map[string][]int, 0)
 	for _, term := range dataStemmed {
 		// determine if term has already been processed
 		_, ok := terms[term]
@@ -246,17 +271,27 @@ func (s *Snip) Index() error {
 		}
 
 		// count occurrences
-		count := 0
-		for _, t := range dataStemmed {
+		var count int
+		var positions []int
+		for idx, t := range dataStemmed {
 			if term == t {
 				count++
+				positions = append(positions, idx)
 			}
 		}
 		terms[term] = count
 		// log.Debug().Str("term", term).Int("count", count).Msg("indexing stem")
+		termsPositions[term] = positions
+		// log.Debug().Str("term", term).Any("positions", positions).Msg("indexing positions")
 	}
 	for term, count := range terms {
 		err := s.SetIndexTermCount(term, count)
+		if err != nil {
+			return err
+		}
+	}
+	for term, positions := range termsPositions {
+		err := s.SetPositions(term, positions)
 		if err != nil {
 			return err
 		}
@@ -269,6 +304,54 @@ func (s *Snip) Index() error {
 func (s *Snip) Rename(newName string) error {
 	s.Name = newName
 	err := s.Update()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetPositions gets the position indicators for a given term
+func (s *Snip) GetPositions(term string) (string, error) {
+	var positions string
+	stmt, err := database.Conn.Prepare(`SELECT positions FROM snip_index WHERE term = ? AND uuid = ?`)
+	if err != nil {
+		return positions, err
+	}
+	err = stmt.Exec(term, s.UUID.String())
+	if err != nil {
+		return positions, err
+	}
+	defer stmt.Close()
+
+	hasRow, err := stmt.Step()
+	if err != nil {
+		return positions, err
+	}
+	if !hasRow {
+		return positions, fmt.Errorf("no rows returned while getting positions")
+	}
+	err = stmt.Scan(&positions)
+	if err != nil {
+		return positions, err
+	}
+	return positions, nil
+}
+
+// SetPositions writes the word positions of a given term
+func (s *Snip) SetPositions(term string, positions []int) error {
+	// join positions into a string
+	var positionsStr []string
+	for _, p := range positions {
+		positionsStr = append(positionsStr, strconv.Itoa(p))
+	}
+	positionsJoined := strings.Join(positionsStr, ",")
+	stmt, err := database.Conn.Prepare(`UPDATE snip_index SET positions = ? WHERE term = ? AND uuid = ?`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	err = stmt.Exec(positionsJoined, term, s.UUID.String())
 	if err != nil {
 		return err
 	}
@@ -372,7 +455,7 @@ func CreateNewDatabase() error {
 	if err != nil {
 		return err
 	}
-	err = database.Conn.Exec(`CREATE TABLE IF NOT EXISTS snip_index(term TEXT, uuid TEXT, count INTEGER)`)
+	err = database.Conn.Exec(`CREATE TABLE IF NOT EXISTS snip_index(term TEXT, uuid TEXT, count INTEGER, positions TEXT)`)
 	if err != nil {
 		return err
 	}
