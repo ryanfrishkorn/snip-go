@@ -51,7 +51,7 @@ type TermContext struct {
 // Snip represents a snippet of data with additional metadata
 type Snip struct {
 	Attachments []Attachment
-	Data        []byte
+	Data        string
 	Timestamp   time.Time
 	Name        string
 	UUID        uuid.UUID
@@ -80,7 +80,7 @@ func (s *Snip) Attach(name string, data []byte) error {
 
 // CountWords returns an integer estimating the number of words in data
 func (s *Snip) CountWords() int {
-	return len(SplitWords(string(s.Data)))
+	return len(SplitWords(s.Data))
 }
 
 // GatherContext returns the surrounding words matching the given term
@@ -119,9 +119,9 @@ func (s *Snip) GatherContext(term string, adjacent int) ([]TermContext, error) {
 	log.Debug().Any("positions", positionsSplitInt).Msg("positions")
 
 	// build split words and corresponding stems
-	words = SplitWords(string(s.Data))
+	words = SplitWords(s.Data)
 	for _, word := range words {
-		// use DownCase here so we preserve the case of the document words
+		// use DownCase here, so we preserve the case of the document words
 		stem, err := snowball.Stem(word, "english", true)
 		if err != nil {
 			return ctxAll, err
@@ -174,7 +174,7 @@ func (s *Snip) GatherContext(term string, adjacent int) ([]TermContext, error) {
 
 // GenerateName returns a clean string derived from processing the data field
 func (s *Snip) GenerateName(wordCount int) string {
-	data := FlattenString(string(s.Data))
+	data := FlattenString(s.Data)
 	// FIXME by allowing additional sensible characters such as `:`
 	pattern := regexp.MustCompile(`\w+`)
 	name := pattern.FindAllString(data, wordCount)
@@ -241,7 +241,7 @@ func (s *Snip) Index() error {
 	}
 	// TODO: remove stop words from dict
 
-	var dataCleaned = SplitWords(string(s.Data))
+	var dataCleaned = SplitWords(s.Data)
 	dataCleaned = StripPunctuation(dataCleaned)
 	dataCleaned = DownCase(dataCleaned)
 	var dataStemmed []string
@@ -450,7 +450,7 @@ func (s *Snip) Update() error {
 	}
 	defer stmt2.Close()
 
-	err = stmt2.Exec(string(s.Data), s.Timestamp.Format(time.RFC3339Nano), s.Name, s.UUID.String())
+	err = stmt2.Exec(s.Data, s.Timestamp.Format(time.RFC3339Nano), s.Name, s.UUID.String())
 	if err != nil {
 		return err
 	}
@@ -763,7 +763,7 @@ func GetFromUUID(searchUUID string) (Snip, error) {
 		if err != nil {
 			return s, err
 		}
-		s.Data = []byte(data)
+		s.Data = data
 		s.UUID, err = uuid.Parse(id)
 		if err != nil {
 			return s, fmt.Errorf("error parsing uuid string into struct")
@@ -824,7 +824,7 @@ func InsertSnip(s Snip) error {
 	defer stmt.Close()
 
 	// reference
-	err = stmt.Exec(s.UUID.String(), s.Timestamp.Format(time.RFC3339Nano), s.Name, string(s.Data))
+	err = stmt.Exec(s.UUID.String(), s.Timestamp.Format(time.RFC3339Nano), s.Name, s.Data)
 	if err != nil {
 		return err
 	}
@@ -862,7 +862,7 @@ func List(limit int) ([]Snip, error) {
 		var idStr string
 		var timestampStr string
 		var name string
-		var data []byte
+		var data string
 
 		err = stmt.Scan(&idStr, &timestampStr, &name, &data)
 		if err != nil {
@@ -893,7 +893,7 @@ func List(limit int) ([]Snip, error) {
 // New returns a new snippet and generates a new UUID for it
 func New() Snip {
 	return Snip{
-		Data:      []byte{},
+		Data:      "",
 		Timestamp: time.Now(),
 		Name:      "",
 		UUID:      uuid.New(),
@@ -966,7 +966,7 @@ func SearchDataTerm(term string) ([]Snip, error) {
 // SearchIndexTerm searches the index and returns results matching the given term
 func SearchIndexTerm(terms []string, limit int) (map[uuid.UUID][]SearchCount, error) {
 	var searchResults = make(map[uuid.UUID][]SearchCount, 0)
-	var limitSet bool = false
+	var limitSet = false
 
 	if limit != 0 {
 		limitSet = true
@@ -985,11 +985,12 @@ func SearchIndexTerm(terms []string, limit int) (map[uuid.UUID][]SearchCount, er
 		if err != nil {
 			return searchResults, err
 		}
-		defer stmt.Close()
+		// defer stmt.Close()
 
 		for {
 			hasRow, err := stmt.Step()
 			if err != nil {
+				stmt.Close()
 				return searchResults, err
 			}
 			if !hasRow {
@@ -1008,10 +1009,12 @@ func SearchIndexTerm(terms []string, limit int) (map[uuid.UUID][]SearchCount, er
 			)
 			err = stmt.Scan(&idStr, &count)
 			if err != nil {
+				stmt.Close()
 				return searchResults, err
 			}
 			id, err := uuid.Parse(idStr)
 			if err != nil {
+				stmt.Close()
 				return searchResults, err
 			}
 			result := SearchCount{
@@ -1069,7 +1072,7 @@ func StemDict() error {
 	wordsEmbedded := strings.Split(string(wordsBytes), "\n")
 	// log.Debug().Int("wordsEmbedded", len(wordsEmbedded)).Msg("word dict count")
 	// log.Debug().Str("wordsEmbedded[0]", wordsEmbedded[0]).Msg("first word")
-	// FIXME - this stem dictionary should be reused so as to not do the work for every snip
+	// FIXME - this stem dictionary should be reused, so as to not do the work for every snip
 	for _, word := range wordsEmbedded {
 		stem, err := snowball.Stem(word, "english", true)
 		if err != nil {

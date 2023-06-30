@@ -149,7 +149,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				log.Debug().Err(err).Str("file", *addCmdFile).Msg("error reading from file")
 				os.Exit(1)
 			}
-			s.Data = data
+			s.Data = string(data)
 		} else {
 			data, err := readFromStdin()
 			if err != nil {
@@ -157,7 +157,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				log.Debug().Err(err).Msg("error reading from standard input")
 				os.Exit(1)
 			}
-			s.Data = data
+			s.Data = string(data)
 		}
 		s.Name = *addCmdName
 		// generate name if empty
@@ -180,7 +180,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			Str("UUID", s.UUID.String()).
 			Str("timestamp", s.Timestamp.String()).
 			Str("name", s.Name).
-			Bytes("Data", s.Data).
+			Str("Data", s.Data).
 			Msg("first snip object")
 		err = snip.InsertSnip(s)
 		if err != nil {

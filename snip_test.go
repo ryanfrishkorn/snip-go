@@ -1,7 +1,6 @@
 package snip
 
 import (
-	"bytes"
 	"compress/gzip"
 	"encoding/xml"
 	"fmt"
@@ -17,7 +16,7 @@ import (
 
 var DatabasePath = "test.sqlite3"
 var UUIDTest = uuid.New()
-var DataTest = []byte("this is VeRy UnIQu3 sample data, and stemming is good for searching")
+var DataTest = "this is VeRy UnIQu3 sample data, and stemming is good for searching"
 var NameTest = "Test Snip of the Century"
 
 // AddDataCSV adds data to the test database
@@ -85,7 +84,7 @@ func AddWikiData(file string) error {
 				// log.Debug().Str("title", doc.Title).Msg("document parsed")
 
 				s := New()
-				s.Data = []byte(doc.Abstract)
+				s.Data = doc.Abstract
 				s.Name = doc.Title
 
 				err = InsertSnip(s)
@@ -188,8 +187,7 @@ func TestGetFromUUID(t *testing.T) {
 	if s.UUID != UUIDTest {
 		t.Errorf("expected UUID of %s, got %s", UUIDTest.String(), s.UUID.String())
 	}
-	// if bytes.Compare(s.Data, DataTest) != 0 {
-	if !bytes.Equal(s.Data, DataTest) {
+	if strings.Compare(s.Data, DataTest) != 0 {
 		t.Errorf("expected snip data and DataTest to be equal, Compare returned non-zero")
 	}
 }
@@ -205,7 +203,7 @@ func TestFlattenString(t *testing.T) {
 
 func TestSnipCountWords(t *testing.T) {
 	s := New()
-	s.Data = []byte("This data\tcontains  eight words\nin its entirety.")
+	s.Data = "This data\tcontains  eight words\nin its entirety."
 	expected := 8
 	count := s.CountWords()
 	if expected != count {
@@ -215,7 +213,7 @@ func TestSnipCountWords(t *testing.T) {
 
 func TestSnipGenerateName(t *testing.T) {
 	s := New()
-	s.Data = []byte("My day   at\n the\taquarium started out")
+	s.Data = "My day   at\n the\taquarium started out"
 
 	expected := "My day at the aquarium"
 	modified := s.GenerateName(5)
@@ -306,7 +304,7 @@ This is the second line.`
 	// t.Logf("   got: %v, %d", textSplit, len(textSplit))
 
 	validate := func(a []string, b []string) bool {
-		for idx, _ := range a {
+		for idx := range a {
 			if strings.Compare(a[idx], b[idx]) != 0 {
 				t.Errorf(`"%s" != "%s"`, a[idx], b[idx])
 				return false
