@@ -624,9 +624,10 @@ snip rm <uuid ...>              remove snip <uuid> ...
 					log.Debug().Err(err).Msg("building snip to display name")
 					os.Exit(1)
 				}
-				fmt.Printf("%s (score: %f)\n", s.UUID, score.Score)
-				fmt.Printf("%s", s.Name)
-				fmt.Printf(" (words: %d)", s.CountWords())
+				fmt.Printf("%s\n", s.Name)
+				fmt.Printf("  %s ", s.UUID)
+				fmt.Printf("(score: %f, ", score.Score)
+				fmt.Printf("words: %d)", s.CountWords())
 
 				// display terms found in document
 				for idx, stat := range score.SearchCounts {
@@ -638,8 +639,8 @@ snip rm <uuid ...>              remove snip <uuid> ...
 					fmt.Printf("%s: %d", stat.Term, stat.Count)
 					if idx == len(score.SearchCounts)-1 {
 						fmt.Printf("]")
+						fmt.Printf("\n")
 					}
-					fmt.Printf("\n")
 				}
 				// show context
 				s, err = snip.GetFromUUID(score.UUID.String())
@@ -666,9 +667,22 @@ snip rm <uuid ...>              remove snip <uuid> ...
 
 					// print each context
 					for _, ctx := range ctxAll {
-						before := strings.Join(ctx.Before, " ")
-						after := strings.Join(ctx.After, " ")
-						fmt.Printf("    \"%s ", before)
+						// these will be printed if not empty
+						var before string
+						var after string
+
+						// print indexes for begin and end of context (to give more context)
+						fmt.Printf("    [%d-%d] ", ctx.BeforeStart, ctx.AfterEnd)
+						before = strings.Join(ctx.Before, " ")
+						after = strings.Join(ctx.After, " ")
+						// log.Debug().Int("ctx.Before", len(ctx.After)).Msg("join before length")
+						// log.Debug().Int("ctx.After", len(ctx.After)).Msg("join after length")
+
+						// if we don't check for empty line, it will produce padding
+						fmt.Printf(`"`) // quotes separate from before string output
+						if before != "" {
+							fmt.Printf("%s ", before)
+						}
 						c := color.New(color.FgRed)
 						_, err = c.Printf("%s", ctx.Term)
 						if err != nil {
@@ -676,9 +690,10 @@ snip rm <uuid ...>              remove snip <uuid> ...
 							log.Debug().Err(err).Msg("color print of context term")
 							os.Exit(1)
 						}
-						fmt.Printf(" %s\"", after)
-						// print indexes for begin and end of context (to give more context)
-						fmt.Printf(" [%d-%d]", ctx.BeforeStart, ctx.AfterEnd)
+						if after != "" {
+							fmt.Printf(" %s", after)
+						}
+						fmt.Printf(`"`) // quotes separate from after string output
 						fmt.Printf("\n")
 					}
 				}

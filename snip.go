@@ -142,7 +142,7 @@ func (s *Snip) GatherContext(term string, adjacent int) ([]TermContext, error) {
 		// log.Debug().Int("position", position).Msg("GatherContextNew")
 		for i := start; i < position; i++ {
 			if i == start {
-				ctx.BeforeStart = i
+				ctx.BeforeStart = i + 1 // add one to reflect word count, not element index
 			}
 			// log.Debug().Msg("ITERATION")
 			ctx.Before = append(ctx.Before, words[i])
@@ -158,7 +158,7 @@ func (s *Snip) GatherContext(term string, adjacent int) ([]TermContext, error) {
 		if lastElement >= len(words)-1 {
 			lastElement = len(words) - 1
 		}
-		ctx.AfterEnd = lastElement
+		ctx.AfterEnd = lastElement + 1 // add one to reflect word count, not element index
 		for i := position + 1; i <= lastElement; i++ {
 			// log.Debug().Int("i", i).Msg("counter")
 			ctx.After = append(ctx.After, words[i])
@@ -182,9 +182,14 @@ func (s *Snip) GenerateName(wordCount int) string {
 
 // SplitWords returns a slice of strings, one word per element
 func SplitWords(text string) []string {
+	// trim whitespace from beginning and end before splitting
+	patternTrimStart := regexp.MustCompile(`^\s+`)
+	patternTrimEnd := regexp.MustCompile(`\s+$`)
+	textTrimmed := patternTrimStart.ReplaceAllString(text, "")
+	textTrimmed = patternTrimEnd.ReplaceAllString(text, "")
 	// split by whitespace
 	pattern := regexp.MustCompile(`(?s)\s+`)
-	words := pattern.Split(text, -1)
+	words := pattern.Split(textTrimmed, -1)
 
 	return words
 }
