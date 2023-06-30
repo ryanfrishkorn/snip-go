@@ -636,7 +636,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 					} else {
 						fmt.Printf(", ")
 					}
-					fmt.Printf("%s: %d", stat.Term, stat.Count)
+					fmt.Printf("%s: %d", stat.Stem, stat.Count)
 					if idx == len(score.SearchCounts)-1 {
 						fmt.Printf("]")
 						fmt.Printf("\n")

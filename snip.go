@@ -25,6 +25,7 @@ var (
 // SearchCount contains info about a search term frequency from the index
 type SearchCount struct {
 	Term  string
+	Stem  string
 	Count int
 }
 
@@ -1015,6 +1016,7 @@ func SearchIndexTerm(terms []string, limit int) (map[uuid.UUID][]SearchCount, er
 			}
 			result := SearchCount{
 				Term:  term,
+				Stem:  termStemmed,
 				Count: count,
 			}
 			searchResults[id] = append(searchResults[id], result)
