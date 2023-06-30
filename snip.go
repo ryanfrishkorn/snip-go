@@ -40,9 +40,11 @@ type SearchScore struct {
 }
 
 type TermContext struct {
-	Before []string
-	Term   string
-	After  []string
+	Before      []string
+	BeforeStart int
+	Term        string
+	After       []string
+	AfterEnd    int
 }
 
 // Snip represents a snippet of data with additional metadata
@@ -77,9 +79,7 @@ func (s *Snip) Attach(name string, data []byte) error {
 
 // CountWords returns an integer estimating the number of words in data
 func (s *Snip) CountWords() int {
-	data := FlattenString(string(s.Data))
-	re := regexp.MustCompile(`\s+`)
-	return len(re.Split(data, -1))
+	return len(SplitWords(string(s.Data)))
 }
 
 // GatherContext returns the surrounding words matching the given term
@@ -141,6 +141,9 @@ func (s *Snip) GatherContext(term string, adjacent int) ([]TermContext, error) {
 		// log.Debug().Int("start", start).Msg("number")
 		// log.Debug().Int("position", position).Msg("GatherContextNew")
 		for i := start; i < position; i++ {
+			if i == start {
+				ctx.BeforeStart = i
+			}
 			// log.Debug().Msg("ITERATION")
 			ctx.Before = append(ctx.Before, words[i])
 			// log.Debug().Str("words[i]", words[i]).Msg("added word to before")
@@ -155,6 +158,7 @@ func (s *Snip) GatherContext(term string, adjacent int) ([]TermContext, error) {
 		if lastElement >= len(words)-1 {
 			lastElement = len(words) - 1
 		}
+		ctx.AfterEnd = lastElement
 		for i := position + 1; i <= lastElement; i++ {
 			// log.Debug().Int("i", i).Msg("counter")
 			ctx.After = append(ctx.After, words[i])

@@ -626,6 +626,9 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				}
 				fmt.Printf("%s (score: %f)\n", s.UUID, score.Score)
 				fmt.Printf("%s", s.Name)
+				fmt.Printf(" (words: %d)", s.CountWords())
+
+				// display terms found in document
 				for idx, stat := range score.SearchCounts {
 					if idx == 0 {
 						fmt.Printf(" [")
@@ -634,8 +637,9 @@ snip rm <uuid ...>              remove snip <uuid> ...
 					}
 					fmt.Printf("%s: %d", stat.Term, stat.Count)
 					if idx == len(score.SearchCounts)-1 {
-						fmt.Printf("]\n")
+						fmt.Printf("]")
 					}
+					fmt.Printf("\n")
 				}
 				// show context
 				s, err = snip.GetFromUUID(score.UUID.String())
@@ -672,7 +676,10 @@ snip rm <uuid ...>              remove snip <uuid> ...
 							log.Debug().Err(err).Msg("color print of context term")
 							os.Exit(1)
 						}
-						fmt.Printf(" %s\"\n", after)
+						fmt.Printf(" %s\"", after)
+						// print indexes for begin and end of context (to give more context)
+						fmt.Printf(" [%d-%d]", ctx.BeforeStart, ctx.AfterEnd)
+						fmt.Printf("\n")
 					}
 				}
 				fmt.Printf("\n")
