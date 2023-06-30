@@ -232,6 +232,7 @@ func (s *Snip) Index() error {
 	// TODO: remove stop words from dict
 
 	var dataCleaned = SplitWords(string(s.Data))
+	dataCleaned = StripPunctuation(dataCleaned)
 	dataCleaned = DownCase(dataCleaned)
 	var dataStemmed []string
 	for _, word := range dataCleaned {
