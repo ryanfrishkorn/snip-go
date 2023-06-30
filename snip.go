@@ -1067,6 +1067,15 @@ func SearchUUID(term string) ([]Snip, error) {
 	return searchResult, nil
 }
 
+func ShortenUUID(id uuid.UUID) []string {
+	idSplit := strings.Split(id.String(), "-")
+	if len(idSplit) != 5 {
+		log.Fatal().Int("len(idSplit)", len(idSplit)).Msg("shortening uuid")
+		panic("shortening uuid, len should be 5")
+	}
+	return idSplit
+}
+
 // StemDict builds a global string array of stemmed terms from the embedded dictionary
 func StemDict() error {
 	wordsEmbedded := strings.Split(string(wordsBytes), "\n")

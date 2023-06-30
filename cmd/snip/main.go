@@ -43,8 +43,8 @@ func main() {
 		dbFilePath = homePath + "/" + dbFilename
 	}
 
-	helpMessage := `
-usage:
+	helpMessage :=
+		`usage:
 snip add                        add a new snip from standard input
        -f <file>                data from file instead of stdin default
        -n <name>                use specified name
@@ -94,12 +94,14 @@ snip rm <uuid ...>              remove snip <uuid> ...
 	getCmdRandom := getCmd.Bool("random", false, "view a random snip")
 
 	listCmd := flag.NewFlagSet("ls", flag.ExitOnError)
+	listCmdLong := listCmd.Bool("l", false, "list full uuid instead of short")
 
 	renameCmd := flag.NewFlagSet("rename", flag.ExitOnError)
 
 	searchCmd := flag.NewFlagSet("search", flag.ExitOnError)
 	searchCmdField := searchCmd.String("f", "data", "field to search (data|uuid)")
 	searchCmdType := searchCmd.String("type", "index", "search type (data|index)")
+	searchCmdLongUUID := searchCmd.Bool("l", false, "list full uuid instead of short")
 
 	rmCmd := flag.NewFlagSet("rm", flag.ExitOnError)
 
@@ -504,9 +506,19 @@ snip rm <uuid ...>              remove snip <uuid> ...
 				os.Exit(1)
 			}
 			if idx == 0 {
-				fmt.Fprintf(os.Stderr, "%s %36s\n", "uuid", "name")
+				if *listCmdLong {
+					// long
+					fmt.Fprintf(os.Stderr, "%s %36s\n", "uuid", "name")
+				} else {
+					// short
+					fmt.Fprintf(os.Stderr, "%s %8s\n", "uuid", "name")
+				}
 			}
-			fmt.Printf("%s %s\n", s.UUID, s.Name)
+			if *listCmdLong {
+				fmt.Printf("%s %s\n", s.UUID, s.Name)
+			} else {
+				fmt.Printf("%s %s\n", snip.ShortenUUID(s.UUID)[0], s.Name)
+			}
 		}
 
 	case "rename":
@@ -625,7 +637,11 @@ snip rm <uuid ...>              remove snip <uuid> ...
 					os.Exit(1)
 				}
 				fmt.Printf("%s\n", s.Name)
-				fmt.Printf("  %s ", s.UUID)
+				if *searchCmdLongUUID {
+					fmt.Printf("  %s ", s.UUID)
+				} else {
+					fmt.Printf("  %s ", snip.ShortenUUID(s.UUID)[0])
+				}
 				fmt.Printf("(score: %f, ", score.Score)
 				fmt.Printf("words: %d)", s.CountWords())
 

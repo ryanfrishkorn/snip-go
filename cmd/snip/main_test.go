@@ -96,7 +96,7 @@ func TestList(t *testing.T) {
 	snipCount := 3   // number of snips in test database
 	snipColumns := 2 // number of output columns when listing
 
-	cmd := exec.Command(appPath, "ls")
+	cmd := exec.Command(appPath, "ls", "-l")
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Errorf("error opening stdout pipe: %v", err)
