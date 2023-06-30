@@ -199,8 +199,8 @@ func StripPunctuation(words []string) []string {
 	var patterns []regexp.Regexp
 	var expressions = []string{
 		// period, comma, etc... (start and end)
-		`^[.,!?]+`,
-		`[.,!?]+$`,
+		`^[.,!?"]+`,
+		`[.,!?"]+$`,
 		// parentheses
 		`^[\(\)]+`,
 		`[\(\)]+$`,
