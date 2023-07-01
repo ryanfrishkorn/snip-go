@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 )
 
 var DatabasePath = "test.sqlite3"
@@ -43,14 +44,14 @@ func AddDataCSV() error {
 
 // AddWikiData converts xml data to snip objects and adds them for testing
 func AddWikiData(file string) error {
-	type article struct {
-		Title    string `xml:"title"`
-		Url      string `xml:"url"`
-		Abstract string `xml:"abstract"`
-	}
 
-	type doc struct {
-		Articles []article `xml:"doc"`
+	type page struct {
+		Title    string `xml:"title"`
+		Revision struct {
+			ID        int    `xml:"id"`
+			Timestamp string `xml:"timestamp"`
+			Text      string `xml:"text"`
+		} `xml:"revision"`
 	}
 
 	f, err := os.Open(file)
@@ -76,16 +77,20 @@ func AddWikiData(file string) error {
 		}
 		switch t := t.(type) {
 		case xml.StartElement:
-			if t.Name.Local == "doc" {
-				var doc article
+			if t.Name.Local == "page" {
+				var doc page
 				if err := d.DecodeElement(&doc, &t); err != nil {
 					return err
 				}
 				// log.Debug().Str("title", doc.Title).Msg("document parsed")
 
 				s := New()
-				s.Data = doc.Abstract
+				s.Data = doc.Revision.Text
 				s.Name = doc.Title
+				s.Timestamp, err = time.Parse(time.RFC3339, doc.Revision.Timestamp)
+				if err != nil {
+					return err
+				}
 
 				err = InsertSnip(s)
 				if err != nil {
@@ -125,7 +130,7 @@ func TestMain(m *testing.M) {
 	}()
 
 	/*
-		err = AddWikiData("testing/enwiki-20230601-abstract-partial.xml.gz")
+		err = AddWikiData("testing/enwiki-partial.xml.gz")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error importing Wikipedia data to test database: %v", err)
 			os.Exit(1)
