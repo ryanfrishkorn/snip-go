@@ -604,8 +604,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 		case "index":
 			terms := searchCmd.Args()
 
-			// fmt.Fprintf(os.Stderr, "Search type %s for: %s\n", *searchCmdType, strings.Join(terms, ", "))
-			searchResults, err := snip.SearchIndexTerm(terms, 0)
+			searchResults, err := snip.SearchIndexTerm(terms, true, 0)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "There was a problem searching the index for term %s\n", terms)
 				log.Debug().Err(err).Msg("error while searching for term")

@@ -964,7 +964,7 @@ func SearchDataTerm(term string) ([]Snip, error) {
 }
 
 // SearchIndexTerm searches the index and returns results matching the given term
-func SearchIndexTerm(terms []string, limit int) (map[uuid.UUID][]SearchCount, error) {
+func SearchIndexTerm(terms []string, requireAll bool, limit int) (map[uuid.UUID][]SearchCount, error) {
 	var searchResults = make(map[uuid.UUID][]SearchCount, 0)
 	var limitSet = false
 
@@ -1024,6 +1024,34 @@ func SearchIndexTerm(terms []string, limit int) (map[uuid.UUID][]SearchCount, er
 			}
 			searchResults[id] = append(searchResults[id], result)
 		}
+	}
+
+	if requireAll {
+		// prune results that do not contain all supplied terms
+		searchResultsPruned := make(map[uuid.UUID][]SearchCount, 0)
+		for id, result := range searchResults {
+			// check each id
+			var termsCollected []string
+			for _, item := range result {
+				// check if term is in collected
+				if !func() bool {
+					for _, t := range termsCollected {
+						if t == item.Term {
+							return true
+						}
+					}
+					return false
+				}() {
+					termsCollected = append(termsCollected, item.Term)
+				}
+			}
+			// keep this id
+			if len(termsCollected) == len(terms) {
+				searchResultsPruned[id] = result
+			}
+		}
+
+		return searchResultsPruned, nil
 	}
 
 	return searchResults, nil
