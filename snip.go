@@ -964,13 +964,8 @@ func SearchDataTerm(term string) ([]Snip, error) {
 }
 
 // SearchIndexTerm searches the index and returns results matching the given term
-func SearchIndexTerm(terms []string, requireAll bool, limit int) (map[uuid.UUID][]SearchCount, error) {
+func SearchIndexTerm(terms []string, requireAll bool) (map[uuid.UUID][]SearchCount, error) {
 	var searchResults = make(map[uuid.UUID][]SearchCount, 0)
-	var limitSet = false
-
-	if limit != 0 {
-		limitSet = true
-	}
 
 	if len(terms) <= 0 {
 		return searchResults, fmt.Errorf("refusing to search for empty string")
@@ -995,12 +990,6 @@ func SearchIndexTerm(terms []string, requireAll bool, limit int) (map[uuid.UUID]
 			}
 			if !hasRow {
 				break
-			}
-			// mind limit
-			if limitSet {
-				if len(searchResults) > limit {
-					break
-				}
 			}
 
 			var (

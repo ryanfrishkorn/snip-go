@@ -100,8 +100,9 @@ snip rm <uuid ...>              remove snip <uuid> ...
 
 	searchCmd := flag.NewFlagSet("search", flag.ExitOnError)
 	searchCmdField := searchCmd.String("f", "data", "field to search (data|uuid)")
-	searchCmdType := searchCmd.String("type", "index", "search type (data|index)")
+	searchCmdLimit := searchCmd.Int("limit", 0, "limit search results")
 	searchCmdLongUUID := searchCmd.Bool("l", false, "list full uuid instead of short")
+	searchCmdType := searchCmd.String("type", "index", "search type (data|index)")
 
 	rmCmd := flag.NewFlagSet("rm", flag.ExitOnError)
 
@@ -604,7 +605,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 		case "index":
 			terms := searchCmd.Args()
 
-			searchResults, err := snip.SearchIndexTerm(terms, true, 0)
+			searchResults, err := snip.SearchIndexTerm(terms, true)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "There was a problem searching the index for term %s\n", terms)
 				log.Debug().Err(err).Msg("error while searching for term")
@@ -627,6 +628,11 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			sort.Slice(scores, func(i int, j int) bool {
 				return scores[i].Score > scores[j].Score
 			})
+
+			// enforce limit after sort
+			if *searchCmdLimit != 0 && len(scores) > *searchCmdLimit {
+				scores = scores[:*searchCmdLimit]
+			}
 			for _, score := range scores {
 				// get full snip to display name
 				s, err := snip.GetFromUUID(score.UUID.String())
@@ -657,6 +663,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 						fmt.Printf("\n")
 					}
 				}
+
 				// show context
 				s, err = snip.GetFromUUID(score.UUID.String())
 				if err != nil {
