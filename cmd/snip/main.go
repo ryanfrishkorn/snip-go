@@ -474,7 +474,12 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			fmt.Printf("timestamp: %s\n", s.Timestamp.Format(time.RFC3339Nano))
 			fmt.Printf("----\n")
 			fmt.Printf("%s", s.Data)
-			fmt.Printf("\n----\n")
+			// add an extra newline if the data does not end with one
+			// no one likes their prompt hijacked. This will not affect raw output.
+			if !strings.HasSuffix(s.Data, "\n") {
+				fmt.Println()
+			}
+			fmt.Printf("----\n")
 			for idx, a := range s.Attachments {
 				// print attachments if present
 				if idx == 0 {
