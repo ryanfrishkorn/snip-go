@@ -472,7 +472,6 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			fmt.Printf("uuid: %s\n", s.UUID.String())
 			fmt.Printf("name: %s\n", s.Name)
 			fmt.Printf("timestamp: %s\n", s.Timestamp.Format(time.RFC3339Nano))
-			fmt.Printf("data: \n")
 			fmt.Printf("----\n")
 			fmt.Printf("%s", s.Data)
 			fmt.Printf("\n----\n")
