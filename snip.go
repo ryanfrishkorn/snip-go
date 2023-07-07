@@ -80,7 +80,7 @@ func (s *Snip) Attach(name string, data []byte) error {
 
 // CountWords returns an integer estimating the number of words in data
 func (s *Snip) CountWords() int {
-	return len(SplitWords(s.Data))
+	return len(strings.Fields(s.Data))
 }
 
 // GatherContext returns the surrounding words matching the given term
@@ -119,7 +119,7 @@ func (s *Snip) GatherContext(term string, adjacent int) ([]TermContext, error) {
 	log.Debug().Any("positions", positionsSplitInt).Msg("positions")
 
 	// build split words and corresponding stems
-	words = SplitWords(s.Data)
+	words = strings.Fields(s.Data)
 	for _, word := range words {
 		// use DownCase here, so we preserve the case of the document words
 		stem, err := snowball.Stem(word, "english", true)
@@ -181,20 +181,6 @@ func (s *Snip) GenerateName(wordCount int) string {
 	return strings.Join(name, " ")
 }
 
-// SplitWords returns a slice of strings, one word per element
-func SplitWords(text string) []string {
-	// trim whitespace from beginning and end before splitting
-	patternTrimStart := regexp.MustCompile(`^\s+`)
-	patternTrimEnd := regexp.MustCompile(`\s+$`)
-	textTrimmed := patternTrimStart.ReplaceAllString(text, "")
-	textTrimmed = patternTrimEnd.ReplaceAllString(text, "")
-	// split by whitespace
-	pattern := regexp.MustCompile(`(?s)\s+`)
-	words := pattern.Split(textTrimmed, -1)
-
-	return words
-}
-
 // StripPunctuation strips all commas, periods, etc. from a slice of strings
 func StripPunctuation(words []string) []string {
 	var patterns []regexp.Regexp
@@ -241,7 +227,7 @@ func (s *Snip) Index() error {
 	}
 	// TODO: remove stop words from dict
 
-	var dataCleaned = SplitWords(s.Data)
+	var dataCleaned = strings.Fields(s.Data)
 	dataCleaned = StripPunctuation(dataCleaned)
 	dataCleaned = DownCase(dataCleaned)
 	var dataStemmed []string

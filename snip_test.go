@@ -304,7 +304,8 @@ This is the second line.`
 		"second",
 		"line.",
 	}
-	textSplit := SplitWords(text)
+	// textSplit := SplitWords(text)
+	textSplit := strings.Fields(text)
 	// t.Logf("expect: %v, %d", expect, len(expect))
 	// t.Logf("   got: %v, %d", textSplit, len(textSplit))
 
