@@ -63,7 +63,6 @@ sh:~$ snip get 99bc7 | fold -sw 80
 uuid: 99bc71c7-573c-403d-a560-996bde675030
 name: Wikipedia - Wren
 timestamp: 2023-06-30T02:43:28.371895-07:00
-data:
 ----
 https://en.wikipedia.org/wiki/Wren
 
@@ -124,4 +123,18 @@ Wikipedia - Wren
 Interesting files
   ca808a9a (score: 0.266667, words: 23) [natur: 1]
     [11-23] "later. This is mostly information about nature, the environment, and other ecological conerns."
+```
+
+## Notes
+
+### database location
+The utility honors the environmental variable `SNIP_DB` for the location of the sqlite file.
+You can modify this in order to store the database file in a different directory than `HOME`.
+
+### text search
+Currently, all terms are matched with an extensive word dictionary compiled by Princeton University [WordNet](https://wordnet.princeton.edu) project.
+This keeps the database clean of all fragments or other oddities. The downside is that things like proper names or 
+technical words are not indexed. In order to search the data fields directly (not the index), you can do this:
+```
+snip search --type data <search_term>
 ```
