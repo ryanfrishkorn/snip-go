@@ -492,36 +492,21 @@ func CumulativeTermsCount(id uuid.UUID) (int, error) {
 	return count, nil
 }
 
-// Delete removes a snip from the database
-func Delete(id uuid.UUID) error {
+// Remove removes a snip from the database
+func Remove(id uuid.UUID) error {
 	// remove associated attachments
 	attachments, err := GetAttachments(id)
 	if err != nil {
 		return err
 	}
 	for _, a := range attachments {
-		err = DeleteAttachment(a.UUID)
+		err = RemoveAttachment(a.UUID)
 		if err != nil {
 			return err
 		}
 	}
 	// remove
 	stmt, err := database.Conn.Prepare(`DELETE from snip WHERE uuid = ?`, id.String())
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-	err = stmt.Exec()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// DeleteAttachment deletes an attachment from the database
-func DeleteAttachment(id uuid.UUID) error {
-	// remove
-	stmt, err := database.Conn.Prepare(`DELETE FROM snip_attachment WHERE uuid = ?`, id.String())
 	if err != nil {
 		return err
 	}

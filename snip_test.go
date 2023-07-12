@@ -239,7 +239,7 @@ func TestSnipUpdate(t *testing.T) {
 
 	// cleanup - leave it the way you found it
 	defer func() {
-		err := Delete(id)
+		err := Remove(id)
 		if err != nil {
 			t.Fatalf("delete function returned error: %v", err)
 		}

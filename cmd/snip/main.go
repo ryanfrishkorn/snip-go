@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"github.com/bvinc/go-sqlite-lite/sqlite3"
@@ -316,17 +317,25 @@ snip rm <uuid ...>              remove snip <uuid> ...
 			}
 			// TODO: Check this behavior, don't we need [1:] or something?
 			for _, idStr := range attachCmdRemove.Args() {
-				id, err := uuid.Parse(idStr)
+				// id, err := uuid.Parse(idStr)
+				attachment, err := snip.GetAttachmentFromUUID(idStr)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "The supplied id %s could not be validated and may be malformed.\n", idStr)
-					log.Debug().Err(err).Str("uuid", "idStr").Msg("error parsing uuid")
+					fmt.Fprintf(os.Stderr, "The supplied id %s could not be located.\n", idStr)
+					log.Debug().Err(err).Str("uuid", "idStr").Msg("error locating attachment")
+					continue
 				}
-				err = snip.DeleteAttachment(id)
+
+				// confirm before deletion
+				if !confirmAction(fmt.Sprintf("REMOVE attachment %s %s", attachment.UUID, attachment.Name)) {
+					fmt.Println("skipped")
+					continue
+				}
+				err = snip.RemoveAttachment(attachment.UUID)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "There was a problem while trying to delete attachment %s", idStr)
+					fmt.Fprintf(os.Stderr, "There was a problem while trying to delete attachment %s %s\n", idStr, err)
 					log.Debug().Err(err).Str("uuid", idStr).Msg("error removing attachment")
 				} else {
-					fmt.Printf("removed attachment %s\n", id)
+					fmt.Println("removed attachment")
 				}
 			}
 
@@ -573,20 +582,25 @@ snip rm <uuid ...>              remove snip <uuid> ...
 		}
 		for idx, arg := range rmCmd.Args() {
 			// parse to uuid because it seems proper
-			id, err := uuid.Parse(arg)
+			s, err := snip.GetFromUUID(arg)
+			// id, err := uuid.Parse(arg)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Could not parse the id of %d/%d %s\n", idx+1, len(rmCmd.Args()), arg)
+				fmt.Fprintf(os.Stderr, "Could not locate id %d/%d %s\n", idx+1, len(rmCmd.Args()), arg)
 				log.Debug().Str("uuid", arg).Err(err).Msg("error parsing uuid input")
 				// Do not exit as others may be valid.
 				continue
 			}
-			err = snip.Delete(id)
+			if !confirmAction(fmt.Sprintf("REMOVE snip %s", s.UUID)) {
+				fmt.Println("skipped")
+				continue
+			}
+			err = snip.Remove(s.UUID)
 			if err != nil {
-				fmt.Printf("Could not remove %d/%d %s\n", idx+1, len(rmCmd.Args()), arg)
-				log.Debug().Str("uuid", arg).Err(err).Msg("error while attempting to delete snip")
+				fmt.Printf("Could not remove %d/%d %s\n", idx+1, len(rmCmd.Args()), s.UUID)
+				log.Debug().Str("uuid", s.UUID.String()).Err(err).Msg("error while attempting to delete snip")
 			} else {
 				// must else because we don't break
-				fmt.Printf("removed %d/%d %s\n", idx+1, len(rmCmd.Args()), arg)
+				fmt.Printf("removed %d/%d %s\n", idx+1, len(rmCmd.Args()), s.UUID)
 			}
 		}
 
@@ -812,6 +826,29 @@ snip rm <uuid ...>              remove snip <uuid> ...
 	}
 
 	log.Debug().Msg("program execution complete")
+}
+
+// confirmAction prompts the user to confirm an action
+func confirmAction(message string) bool {
+	prompt := "[Y/n]"
+	r := bufio.NewReader(os.Stdin)
+	fmt.Printf("%s %s: ", message, prompt)
+	response, err := r.ReadString('\n')
+	if err != nil {
+		return false
+	}
+	// remove newline for comparison
+	response = strings.TrimSuffix(response, "\n")
+	switch strings.ToLower(response) {
+	case "":
+		fallthrough
+	case "yes":
+		fallthrough
+	case "y":
+		return true
+	}
+
+	return false
 }
 
 // readFromFile reads all data from specified file

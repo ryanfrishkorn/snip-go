@@ -153,3 +153,46 @@ func NewAttachment() Attachment {
 		UUID:      uuid.New(),
 	}
 }
+
+// RemoveAttachment deletes an attachment from the database
+func RemoveAttachment(id uuid.UUID) error {
+	// see if it exists first
+	stmt, err := database.Conn.Prepare(`SELECT uuid FROM snip_attachment where uuid = ? LIMIT 2`, id.String())
+	if err != nil {
+		return err
+	}
+
+	count := 0
+	for {
+		hasRow, err := stmt.Step()
+		if err != nil {
+			stmt.Close()
+			return err
+		}
+		if !hasRow {
+			break
+		}
+		count += 1
+	}
+	stmt.Close()
+
+	// result should always be unique
+	if count == 0 {
+		return fmt.Errorf("could not locate attachment")
+	}
+	if count != 1 {
+		return fmt.Errorf("attachment id returned ambiguous results")
+	}
+
+	// remove
+	stmt, err = database.Conn.Prepare(`DELETE FROM snip_attachment WHERE uuid = ?`, id.String())
+	if err != nil {
+		return err
+	}
+	err = stmt.Exec()
+	stmt.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}
