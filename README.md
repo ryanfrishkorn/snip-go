@@ -131,14 +131,6 @@ Interesting files
 The utility honors the environmental variable `SNIP_DB` for the location of the sqlite file.
 You can modify this in order to store the database file in a different directory than `HOME`.
 
-### text search
-Currently, all terms are matched with an extensive word dictionary compiled by Princeton University [WordNet](https://wordnet.princeton.edu) project.
-This keeps the database clean of all fragments or other oddities. The downside is that things like proper names or 
-technical words are not indexed. In order to search the data fields directly (not the index), you can do this:
-```
-snip search --type data <search_term>
-```
-
 ### interesting things
 ```
 sqlite3 -table .snip.sqlite3 "select uuid, term, count, positions from snip_index" | fzf --no-sort --tac --preview "snip get {2} | grep -Ei --color=always '{4}\w*|$' | fold -sw 100"
