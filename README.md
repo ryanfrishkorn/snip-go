@@ -10,11 +10,13 @@ cd cmd/snip
 ```
 
 ### build
+This will produce a binary in the current directory named `snip`
 ```
 go build
 ```
 
 ### install
+This will install the binary to whatever is set in `$GOBIN`. You can add this to your path, or put the binary wherever you choose after running the build command.
 ```
 go install
 ```
