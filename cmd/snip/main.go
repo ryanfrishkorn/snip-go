@@ -81,6 +81,7 @@ snip get <uuid>                 retrieve snip with specified uuid
        -raw                     output only raw data from snip
 
 snip ls                         list all snips
+       -l                       list with full uuid
 
 snip search <term ...>          return snips whose data contains given term
        -type <data|index>       specify search source (data uses a singular term only)
