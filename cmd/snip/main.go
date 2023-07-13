@@ -100,6 +100,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 	renameCmd := flag.NewFlagSet("rename", flag.ExitOnError)
 
 	searchCmd := flag.NewFlagSet("search", flag.ExitOnError)
+	searchCmdContextWords := searchCmd.Int("context", 6, "number of context words to display")
 	searchCmdField := searchCmd.String("f", "data", "field to search (data|uuid)")
 	searchCmdLimit := searchCmd.Int("limit", 0, "limit search results")
 	searchCmdLongUUID := searchCmd.Bool("l", false, "list full uuid instead of short")
@@ -690,7 +691,7 @@ snip rm <uuid ...>              remove snip <uuid> ...
 					os.Exit(1)
 				}
 				for _, term := range terms {
-					ctxAll, err := s.GatherContext(term, 6)
+					ctxAll, err := s.GatherContext(term, *searchCmdContextWords)
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "There was a problem gathering context for term %s: %v\n", term, err)
 						log.Debug().Str("term", term).Str("uuid", score.UUID.String()).Msg("gathering context")
