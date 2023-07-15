@@ -322,3 +322,37 @@ This is the second line.`
 		t.Errorf("word slices failed comparison, \nexpected: %v\n      got %v", expect, textSplit)
 	}
 }
+
+func TestUnicodeSplit(t *testing.T) {
+	expect := []string{
+		"This",
+		"is",
+		"a",
+		"list",
+		"of",
+		"Lipsum",
+		"words",
+		"with",
+		"some",
+		"hyphen",
+		"nation",
+		"and",
+		"extra",
+		"spaces",
+		"and",
+		"tabs",
+		"and",
+		"stuff",
+		"it",
+		"is",
+		"good",
+	}
+
+	data := "This is a list of Lipsum words, with some hyphen-nation and [extra] spaces  and tabs	and -stuff-; it is good."
+	wordsSplit := SplitWords(data)
+	for idx, w := range wordsSplit {
+		if strings.Compare(expect[idx], w) != 0 {
+			t.Errorf("expected: %v, got %v", expect, wordsSplit)
+		}
+	}
+}

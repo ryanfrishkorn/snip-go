@@ -138,3 +138,9 @@ technical words are not indexed. In order to search the data fields directly (no
 ```
 snip search --type data <search_term>
 ```
+
+### interesting things
+```
+sqlite3 -table .snip.sqlite3 "select uuid, term, count, positions from snip_index" | fzf --no-sort --tac --preview "snip get {2} | grep -Ei --color=always '{4}\w*|$' | fold -sw 100"
+```
+In `fzf` use spaces between terms in any order

@@ -6,6 +6,7 @@ import (
 	"github.com/bvinc/go-sqlite-lite/sqlite3"
 	"github.com/google/uuid"
 	"github.com/kljensen/snowball"
+	"github.com/rivo/uniseg"
 	"github.com/rs/zerolog/log"
 	"github.com/ryanfrishkorn/snip/database"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 var (
@@ -80,7 +82,7 @@ func (s *Snip) Attach(name string, data []byte) error {
 
 // CountWords returns an integer estimating the number of words in data
 func (s *Snip) CountWords() int {
-	return len(strings.Fields(s.Data))
+	return len(SplitWords(s.Data))
 }
 
 // GatherContext returns the surrounding words matching the given term
@@ -119,9 +121,9 @@ func (s *Snip) GatherContext(term string, adjacent int) ([]TermContext, error) {
 	log.Debug().Any("positions", positionsSplitInt).Msg("positions")
 
 	// build split words and corresponding stems
-	words = strings.Fields(s.Data)
+	words = SplitWords(s.Data)
 	for _, word := range words {
-		// use DownCase here, so we preserve the case of the document words
+		// apparently we don't need to use DownCase here since the stemmer does so
 		stem, err := snowball.Stem(word, "english", true)
 		if err != nil {
 			return ctxAll, err
@@ -217,18 +219,8 @@ func DownCase(words []string) []string {
 
 // Index stems all data and writes it to a search table
 func (s *Snip) Index() error {
-	// make sure dictionary is stemmed
-	if len(wordsStemmed) == 0 {
-		// log.Debug().Msg("stemming embedded dictionary")
-		err := StemDict()
-		if err != nil {
-			return err
-		}
-	}
 	// TODO: remove stop words from dict
-
-	var dataCleaned = strings.Fields(s.Data)
-	dataCleaned = StripPunctuation(dataCleaned)
+	dataCleaned := SplitWords(s.Data)
 	dataCleaned = DownCase(dataCleaned)
 	var dataStemmed []string
 	for _, word := range dataCleaned {
@@ -251,20 +243,6 @@ func (s *Snip) Index() error {
 		_, ok := terms[term]
 		if ok {
 			// skip
-			continue
-		}
-
-		// determine if stem is valid
-		valid := false
-		for _, wordStem := range wordsStemmed {
-			if wordStem == term {
-				valid = true
-				// log.Debug().Str("term", term).Msg("valid")
-				break
-			}
-		}
-		if !valid {
-			// log.Debug().Str("term", term).Msg("did not match dictionary")
 			continue
 		}
 
@@ -802,6 +780,16 @@ func InsertSnip(s Snip) error {
 	return nil
 }
 
+// IsWord determines if a string is a valid word using unicode functions
+func IsWord(word string) bool {
+	for _, c := range word {
+		if !unicode.IsLetter(c) && !unicode.IsDigit(c) {
+			return false
+		}
+	}
+	return true
+}
+
 // List returns a slice of all Snips in the database
 func List(limit int) ([]Snip, error) {
 	var results []Snip
@@ -1062,6 +1050,21 @@ func ShortenUUID(id uuid.UUID) []string {
 		panic("shortening uuid, len should be 5")
 	}
 	return idSplit
+}
+
+// SplitWords splits words using unicode standard splitting functions
+func SplitWords(data string) []string {
+	var word string
+	var output []string
+	state := -1
+	for len(data) > 0 {
+		word, data, state = uniseg.FirstWordInString(data, state)
+		if IsWord(word) {
+			output = append(output, word)
+		}
+	}
+
+	return output
 }
 
 // StemDict builds a global string array of stemmed terms from the embedded dictionary
