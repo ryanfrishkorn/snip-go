@@ -1,7 +1,6 @@
 package snip
 
 import (
-	"embed"
 	"fmt"
 	"github.com/bvinc/go-sqlite-lite/sqlite3"
 	"github.com/google/uuid"
@@ -15,13 +14,6 @@ import (
 	"strings"
 	"time"
 	"unicode"
-)
-
-var (
-	//go:embed words_princeton.txt
-	f             embed.FS
-	wordsBytes, _ = f.ReadFile("words_princeton.txt")
-	wordsStemmed  []string
 )
 
 // SearchCount contains info about a search term frequency from the index
@@ -1065,24 +1057,6 @@ func SplitWords(data string) []string {
 	}
 
 	return output
-}
-
-// StemDict builds a global string array of stemmed terms from the embedded dictionary
-func StemDict() error {
-	wordsEmbedded := strings.Split(string(wordsBytes), "\n")
-	// log.Debug().Int("wordsEmbedded", len(wordsEmbedded)).Msg("word dict count")
-	// log.Debug().Str("wordsEmbedded[0]", wordsEmbedded[0]).Msg("first word")
-	// FIXME - this stem dictionary should be reused, so as to not do the work for every snip
-	for _, word := range wordsEmbedded {
-		stem, err := snowball.Stem(word, "english", true)
-		if err != nil {
-			return err
-		}
-		wordsStemmed = append(wordsStemmed, stem)
-	}
-	// log.Debug().Int("wordsStemmed", len(wordsStemmed)).Msg("word stem count")
-	// log.Debug().Str("wordsStemmed[0]", wordsStemmed[0]).Msg("first stem")
-	return nil
 }
 
 // WriteAttachment writes the attached file to the current working directory
