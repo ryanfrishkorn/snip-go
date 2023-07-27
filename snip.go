@@ -153,7 +153,7 @@ func (s *Snip) GatherContext(term string, adjacent int) ([]TermContext, error) {
 		if lastElement >= len(words)-1 {
 			lastElement = len(words) - 1
 		}
-		ctx.AfterEnd = lastElement + 1 // add one to reflect word count, not element index
+		ctx.AfterEnd = lastElement
 		for i := position + 1; i <= lastElement; i++ {
 			// log.Debug().Int("i", i).Msg("counter")
 			ctx.After = append(ctx.After, words[i])
